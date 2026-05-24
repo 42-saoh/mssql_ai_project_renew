@@ -37,6 +37,18 @@ pip install -r requirements-dev.txt
 make test
 ```
 
+Windows PowerShell:
+
+```powershell
+py -3.14 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e packages/contracts -e packages/orchestration -e packages/validation
+python -m pip install -r requirements-dev.txt
+python .\scripts\codex-strict-goal-runner.py --workspace . --goals-dir goals --sandbox workspace-write --approval never --auto-commit
+```
+
+Goal validation currently calls `make test`, so Windows environments also need a working GNU Make executable on `PATH`.
+
 ## PGPT configuration
 
 User chat orchestration can optionally call PGPT through the OpenAI-compatible Responses API. Configure it with `PGPT_BASE_URL`, `PGPT_MODEL`, and `PGPT_API_KEY`; see `docs/reference/pgpt-responses-api.md` for the supported parameter allowlist and safety limits.

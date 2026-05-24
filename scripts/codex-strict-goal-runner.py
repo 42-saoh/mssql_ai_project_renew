@@ -73,6 +73,16 @@ def print_step(message: str) -> None:
     print(f"\n[goal-runner] {message}", flush=True)
 
 
+def is_windows() -> bool:
+    return os.name == "nt"
+
+
+def format_command_for_log(cmd: List[str]) -> str:
+    if is_windows():
+        return subprocess.list2cmdline(cmd)
+    return " ".join(shlex.quote(c) for c in cmd)
+
+
 def run_command(
     cmd: List[str],
     cwd: Path,
@@ -80,19 +90,30 @@ def run_command(
     input_text: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, str, str]:
-    proc = subprocess.run(
-        cmd,
-        cwd=str(cwd),
-        input=input_text,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        env=env,
-    )
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=str(cwd),
+            input=input_text,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+        returncode = proc.returncode
+        stdout = proc.stdout or ""
+        stderr = proc.stderr or ""
+    except OSError as exc:
+        returncode = 127 if isinstance(exc, FileNotFoundError) else 126
+        stdout = ""
+        stderr = f"{type(exc).__name__}: {exc}\n"
+
     if log_path:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("w", encoding="utf-8") as f:
-            f.write("$ " + " ".join(shlex.quote(c) for c in cmd) + "\n\n")
+            f.write("$ " + format_command_for_log(cmd) + "\n\n")
             if input_text:
                 f.write("--- stdin ---\n")
                 f.write(input_text)
@@ -100,20 +121,48 @@ def run_command(
                     f.write("\n")
                 f.write("\n")
             f.write("--- stdout ---\n")
-            f.write(proc.stdout)
-            if not proc.stdout.endswith("\n"):
+            f.write(stdout)
+            if not stdout.endswith("\n"):
                 f.write("\n")
             f.write("\n--- stderr ---\n")
-            f.write(proc.stderr)
-            if not proc.stderr.endswith("\n"):
+            f.write(stderr)
+            if not stderr.endswith("\n"):
                 f.write("\n")
-            f.write(f"\n--- exit_code ---\n{proc.returncode}\n")
-    return proc.returncode, proc.stdout, proc.stderr
+            f.write(f"\n--- exit_code ---\n{returncode}\n")
+    return returncode, stdout, stderr
 
 
-def ensure_codex() -> None:
-    if shutil.which("codex") is None:
-        raise SystemExit("codex CLI was not found on PATH. Install it first: npm i -g @openai/codex")
+def resolve_codex_executable(explicit: Optional[str]) -> str:
+    if explicit:
+        resolved = shutil.which(explicit) or explicit
+        if is_windows() and Path(resolved).suffix.lower() not in {".bat", ".cmd", ".com", ".exe"}:
+            raise SystemExit(
+                f"Codex executable is not directly runnable by Windows Python: {resolved}. "
+                "Pass --codex-bin codex.cmd or put codex.cmd on PATH."
+            )
+        return resolved
+
+    if is_windows():
+        for name in ("codex.cmd", "codex.exe", "codex.bat"):
+            resolved = shutil.which(name)
+            if resolved:
+                return resolved
+        bare = shutil.which("codex")
+        if bare:
+            raise SystemExit(
+                f"Only a non-Windows Codex shim was found: {bare}. "
+                "Put codex.cmd on PATH or pass --codex-bin codex.cmd."
+            )
+    else:
+        resolved = shutil.which("codex")
+        if resolved:
+            return resolved
+
+    raise SystemExit("codex CLI was not found on PATH. Install it first: npm i -g @openai/codex")
+
+
+def ensure_codex(explicit: Optional[str]) -> str:
+    return resolve_codex_executable(explicit)
 
 
 def ensure_git_repo(workspace: Path, skip: bool) -> None:
@@ -235,7 +284,7 @@ def mark_from_pending(state: Dict[str, Any], start_idx: int) -> None:
 def build_codex_base_cmd(args: argparse.Namespace, sandbox: str, output_file: Path) -> List[str]:
     # Put global flags before the subcommand for broad CLI-version compatibility.
     cmd = [
-        "codex",
+        args.codex_bin,
         "--ask-for-approval",
         args.approval,
     ]
@@ -256,6 +305,27 @@ def build_codex_base_cmd(args: argparse.Namespace, sandbox: str, output_file: Pa
         cmd.append("--skip-git-repo-check")
     cmd.append("-")
     return cmd
+
+
+def build_validation_command(commands: str, validation_shell: str) -> List[str]:
+    shell = validation_shell
+    if shell == "auto":
+        shell = "powershell" if is_windows() else "bash"
+
+    if shell == "bash":
+        return ["bash", "-lc", commands]
+    if shell == "powershell":
+        script = "\n".join(
+            [
+                "$ErrorActionPreference = 'Stop'",
+                commands,
+                "if ($null -ne $global:LASTEXITCODE) { exit $global:LASTEXITCODE }",
+            ]
+        )
+        return ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script]
+    if shell == "cmd":
+        return ["cmd", "/d", "/s", "/c", commands]
+    raise ValueError(f"Unsupported validation shell: {validation_shell}")
 
 
 def goal_relative(path: Path, workspace: Path) -> str:
@@ -313,8 +383,9 @@ def run_validation(goal_file: Path, args: argparse.Namespace, run_dir: Path, lab
         return False
 
     log_path = run_dir / f"{label}.validation.log"
-    print_step(f"Running validation for {goal_file.name}: {commands!r}")
-    code, _, _ = run_command(["bash", "-lc", commands], cwd=args.workspace, log_path=log_path)
+    cmd = build_validation_command(commands, args.validation_shell)
+    print_step(f"Running validation for {goal_file.name} with {cmd[0]}: {commands!r}")
+    code, _, _ = run_command(cmd, cwd=args.workspace, log_path=log_path)
     if code == 0:
         print_step(f"Validation passed for {goal_file.name}")
         return True
@@ -430,12 +501,27 @@ def earliest_failed_index(result: Dict[str, Any], goals: List[Path], default: in
     return default
 
 
+def relative_pathspec(path: Path, workspace: Path) -> Optional[str]:
+    try:
+        return path.resolve().relative_to(workspace.resolve()).as_posix().rstrip("/")
+    except ValueError:
+        return None
+
+
+def build_git_add_command(args: argparse.Namespace) -> List[str]:
+    cmd = ["git", "add", "-A", "--", "."]
+    state_rel = relative_pathspec(args.state_dir, args.workspace)
+    if state_rel:
+        cmd.append(f":(exclude){state_rel}/")
+    return cmd
+
+
 def auto_commit_if_requested(args: argparse.Namespace, goal_file: Path, run_dir: Path) -> None:
     if not args.auto_commit:
         return
     message = f"codex-goal: complete {goal_file.stem}"
     print_step(f"Auto-committing checkpoint: {message}")
-    run_command(["git", "add", "-A"], cwd=args.workspace, log_path=run_dir / "git-add.log")
+    run_command(build_git_add_command(args), cwd=args.workspace, log_path=run_dir / "git-add.log")
     code, _, _ = run_command(["git", "commit", "-m", message], cwd=args.workspace, log_path=run_dir / "git-commit.log")
     if code != 0:
         print_step("Auto-commit skipped or failed; see git-commit.log")
@@ -468,9 +554,11 @@ def main() -> int:
     parser.add_argument("--goals-dir", default="goals", type=Path, help="Directory containing G*.md goal files")
     parser.add_argument("--state-dir", default=".codex-goals", type=Path, help="State/log directory")
     parser.add_argument("--model", default=None, help="Optional Codex model override")
+    parser.add_argument("--codex-bin", default=None, help="Codex CLI executable; Windows auto-detects codex.cmd")
     parser.add_argument("--approval", default="never", choices=["untrusted", "on-request", "never"], help="Codex approval mode")
     parser.add_argument("--sandbox", default="workspace-write", choices=["read-only", "workspace-write", "danger-full-access"], help="Sandbox for execution runs")
     parser.add_argument("--verify-sandbox", default="read-only", choices=["read-only", "workspace-write", "danger-full-access"], help="Sandbox for semantic verification runs")
+    parser.add_argument("--validation-shell", default="auto", choices=["auto", "bash", "powershell", "cmd"], help="Shell used for goal validation commands")
     parser.add_argument("--max-rounds", type=int, default=80, help="Overall loop limit")
     parser.add_argument("--max-attempts-per-goal", type=int, default=5, help="Stop after this many execution attempts per goal")
     parser.add_argument("--skip-git-repo-check", action="store_true", help="Pass --skip-git-repo-check to Codex and bypass local git check")
@@ -485,7 +573,7 @@ def main() -> int:
     args.state_dir = (args.workspace / args.state_dir).resolve() if not args.state_dir.is_absolute() else args.state_dir.resolve()
     args.schema_file = args.state_dir / "codex-goal-result.schema.json"
 
-    ensure_codex()
+    args.codex_bin = ensure_codex(args.codex_bin)
     ensure_git_repo(args.workspace, args.skip_git_repo_check)
 
     goals = discover_goals(args.goals_dir)
