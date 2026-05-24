@@ -6,3 +6,5 @@ cases:
     summary: Raw prompts, provider responses, SP definitions, row data, and secrets must be rejected before storage.
   - id: g02_storage_schema_omits_raw_payload_columns
     summary: PLF storage schema must avoid raw prompt, provider response, stored procedure definition, row data, and secret columns.
+  - id: g03_api_persistence_sanitizes_chat_and_artifacts
+    summary: FastAPI platform persistence must store sanitized chat summaries and artifact content refs, not raw user messages or inline unsafe artifact content.

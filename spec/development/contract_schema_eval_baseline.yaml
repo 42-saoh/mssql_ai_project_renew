@@ -32,6 +32,7 @@ openapi:
     - /api/v1/chat-runs
     - /api/v1/chat-runs/{chatRunId}
     - /api/v1/chat-runs/{chatRunId}/resume
+    - /api/v1/conversations/{conversationId}
     - /api/v1/artifacts
     - /api/v1/artifacts/{artifactId}
     - /api/v1/metadata/search
@@ -39,6 +40,7 @@ openapi:
     - /api/v1/metadata/tools
     - /api/v1/metadata/tools/{toolName}/invoke
     - /api/v1/metadata/db-profiles
+    - /api/v1/approvals/{approvalId}/resume
 
 runnerSchemas:
   request:
@@ -95,6 +97,26 @@ artifactSchemas:
 
 dbSchema:
   path: db/schema
+  applyFile: db/schema/plf_db_agent_v2.sql
+  applyScope: PLF platform storage database only; never customer/business MSSQL databases.
+  platformStoreEnv:
+    defaults:
+      PLF_STORE_DB_DIALECT: mssql
+      PLF_STORE_DB_HOST: 127.0.0.1
+      PLF_STORE_DB_PORT: "1433"
+      PLF_STORE_DB_NAME: plf_db_agent_v2
+      PLF_STORE_DB_USER: sa
+      PLF_STORE_DB_PASSWORD: ""
+      PLF_STORE_DB_DRIVER: ODBC Driver 18 for SQL Server
+      PLF_STORE_DB_ENCRYPT: "false"
+      PLF_STORE_DB_TRUST_SERVER_CERTIFICATE: "true"
+      PLF_STORE_SCHEMA_PATH: db/schema/plf_db_agent_v2.sql
+      PLF_STORE_AUTO_APPLY_SCHEMA: "false"
+    schemaPathKey: PLF_STORE_SCHEMA_PATH
+    autoApplySchemaKey: PLF_STORE_AUTO_APPLY_SCHEMA
+    autoApplySchemaDefaultAllowed: false
+    customerDbCredentialsAllowed: false
+    runtimeCredentialInheritanceAllowed: false
   migrationFiles:
     - db/schema/v001_platform_core.sql
     - db/schema/v002_artifacts.sql
@@ -111,12 +133,12 @@ dbSchema:
     - evidence_bundles
   requiredStorageControls:
     artifacts:
-      - production_ready INTEGER NOT NULL DEFAULT 0
-      - review_required INTEGER NOT NULL DEFAULT 1
+      - production_ready BIT NOT NULL CONSTRAINT df_artifacts_production_ready DEFAULT (0)
+      - review_required BIT NOT NULL CONSTRAINT df_artifacts_review_required DEFAULT (1)
     artifact_validations:
-      - schema_valid INTEGER NOT NULL
-      - policy_valid INTEGER NOT NULL
-      - static_valid INTEGER NOT NULL
+      - schema_valid BIT NOT NULL
+      - policy_valid BIT NOT NULL
+      - static_valid BIT NOT NULL
   forbiddenStorageFields:
     - raw_prompt
     - raw_provider_response

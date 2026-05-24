@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -16,6 +17,16 @@ def _json(rel: str) -> dict:
 
 def _yaml(rel: str) -> dict:
     return yaml.safe_load((ROOT / rel).read_text(encoding="utf-8"))
+
+
+def _env_values() -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in (ROOT / ".env.example").read_text(encoding="utf-8").splitlines():
+        if not line or line.strip().startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
 
 
 def _case_ids(cases: list[dict]) -> set[str]:
@@ -49,6 +60,7 @@ def test_g02_baseline_references_existing_contract_files():
     assert (ROOT / baseline["openapi"]["path"]).exists()
     assert (ROOT / baseline["runnerSchemas"]["request"]["path"]).exists()
     assert (ROOT / baseline["runnerSchemas"]["result"]["path"]).exists()
+    assert (ROOT / baseline["dbSchema"]["applyFile"]).exists()
     for path in baseline["artifactSchemas"]["paths"]:
         assert (ROOT / path).exists()
     for path in baseline["dbSchema"]["migrationFiles"]:
@@ -125,3 +137,47 @@ def test_eval_baseline_declares_cases_for_all_required_suites():
     for suite, expected_cases in baseline["evalBaseline"]["requiredCases"].items():
         actual_cases = _case_ids(_yaml(f"spec/eval/{suite}.yaml")["cases"])
         assert set(expected_cases) <= actual_cases
+
+
+def test_db_apply_schema_declares_required_tables_and_is_executable():
+    baseline = _yaml("spec/development/contract_schema_eval_baseline.yaml")
+    apply_sql = (ROOT / baseline["dbSchema"]["applyFile"]).read_text(encoding="utf-8")
+    migration_sql = "\n".join(
+        (ROOT / path).read_text(encoding="utf-8")
+        for path in baseline["dbSchema"]["migrationFiles"]
+    )
+
+    apply_tables = {
+        name.lower()
+        for name in re.findall(r"CREATE TABLE\s+dbo\.([A-Za-z_][A-Za-z0-9_]*)", apply_sql, flags=re.I)
+    }
+    migration_tables = {
+        name.lower()
+        for name in re.findall(r"CREATE TABLE\s+dbo\.([A-Za-z_][A-Za-z0-9_]*)", migration_sql, flags=re.I)
+    }
+
+    assert apply_tables == migration_tables == set(baseline["dbSchema"]["requiredTables"])
+    assert "PLF platform storage database" in apply_sql
+    assert "customer/business MSSQL" in apply_sql
+    assert "CREATE TABLE IF NOT EXISTS" not in apply_sql.upper()
+    for table in baseline["dbSchema"]["requiredTables"]:
+        assert f"OBJECT_ID(N'dbo.{table}', N'U')" in apply_sql
+
+
+def test_platform_store_env_contract_matches_example_and_apply_schema():
+    baseline = _yaml("spec/development/contract_schema_eval_baseline.yaml")
+    store_env = baseline["dbSchema"]["platformStoreEnv"]
+    defaults = store_env["defaults"]
+    values = _env_values()
+
+    for key, expected in defaults.items():
+        assert values[key] == expected
+
+    assert defaults[store_env["schemaPathKey"]] == baseline["dbSchema"]["applyFile"]
+    assert defaults[store_env["autoApplySchemaKey"]] == "false"
+    assert store_env["autoApplySchemaDefaultAllowed"] is False
+    assert store_env["customerDbCredentialsAllowed"] is False
+    assert store_env["runtimeCredentialInheritanceAllowed"] is False
+    assert defaults["PLF_STORE_DB_DIALECT"] == "mssql"
+    assert defaults["PLF_STORE_DB_PORT"] == "1433"
+    assert defaults["PLF_STORE_DB_PASSWORD"] == ""

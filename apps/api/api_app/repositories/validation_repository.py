@@ -5,8 +5,25 @@ _STORE: dict[str, dict] = {}
 
 def put(key: str, value: dict) -> dict:
     _STORE[key] = dict(value)
-    return _STORE[key]
+    return dict(_STORE[key])
 
 
 def get(key: str) -> dict | None:
-    return _STORE.get(key)
+    value = _STORE.get(key)
+    return dict(value) if value is not None else None
+
+
+def list_for_artifact(artifact_id: str) -> list[dict]:
+    return [
+        dict(value)
+        for value in _STORE.values()
+        if value.get("artifact_id") == artifact_id
+    ]
+
+
+def list_all() -> list[dict]:
+    return [dict(value) for value in _STORE.values()]
+
+
+def clear() -> None:
+    _STORE.clear()

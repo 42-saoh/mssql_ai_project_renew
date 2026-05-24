@@ -9,4 +9,13 @@ def put(key: str, value: dict) -> dict:
 
 
 def get(key: str) -> dict | None:
-    return _STORE.get(key)
+    value = _STORE.get(key)
+    return dict(value) if value is not None else None
+
+
+def list_all() -> list[dict]:
+    return [dict(value) for value in _STORE.values()]
+
+
+def clear() -> None:
+    _STORE.clear()

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from uuid import uuid4
-
 try:
     from fastapi import APIRouter
     from pydantic import BaseModel
@@ -9,7 +7,7 @@ except Exception:
     APIRouter = None
     BaseModel = object
 
-from plf_agent_orchestration.graph import orchestrate_message
+from apps.api.api_app.services import chat_service
 
 router = APIRouter() if APIRouter else None
 
@@ -23,20 +21,16 @@ class ChatRunCreate(BaseModel):
 if router:
     @router.post("/chat-runs")
     def create_chat_run(req: ChatRunCreate):
-        conversation_id = req.conversationId or f"conv_{uuid4().hex[:12]}"
-        chat_run_id = f"chatrun_{uuid4().hex[:12]}"
-        routed = orchestrate_message(req.message)
-        return {
-            "chatRunId": chat_run_id,
-            "conversationId": conversation_id,
-            "status": "ACCEPTED" if routed["policyDecision"] == "ALLOW" else "BLOCKED",
-            **routed,
-        }
+        return chat_service.create_chat_run(
+            req.message,
+            conversation_id=req.conversationId,
+            actor_id=req.actorId,
+        )
 
     @router.get("/chat-runs/{chatRunId}")
     def get_chat_run(chatRunId: str):
-        return {"chatRunId": chatRunId, "status": "SCAFFOLD"}
+        return chat_service.get_chat_run(chatRunId)
 
     @router.post("/chat-runs/{chatRunId}/resume")
     def resume_chat_run(chatRunId: str):
-        return {"chatRunId": chatRunId, "status": "RESUMED"}
+        return chat_service.get_chat_run(chatRunId) | {"status": "RESUMED"}

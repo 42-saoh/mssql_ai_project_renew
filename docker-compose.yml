@@ -4,6 +4,17 @@ services:
     command: uvicorn apps.api.api_app.main:app --host 0.0.0.0 --port 8000
     environment:
       PLF_METADATA_GATEWAY_URL: http://host.docker.internal:8100
+      PLF_STORE_DB_DIALECT: mssql
+      PLF_STORE_DB_HOST: ${PLF_STORE_DB_HOST:-host.docker.internal}
+      PLF_STORE_DB_PORT: ${PLF_STORE_DB_PORT:-1433}
+      PLF_STORE_DB_NAME: ${PLF_STORE_DB_NAME:-plf_db_agent_v2}
+      PLF_STORE_DB_USER: ${PLF_STORE_DB_USER:-sa}
+      PLF_STORE_DB_PASSWORD: ${PLF_STORE_DB_PASSWORD:-}
+      PLF_STORE_DB_DRIVER: ${PLF_STORE_DB_DRIVER:-ODBC Driver 18 for SQL Server}
+      PLF_STORE_DB_ENCRYPT: ${PLF_STORE_DB_ENCRYPT:-false}
+      PLF_STORE_DB_TRUST_SERVER_CERTIFICATE: ${PLF_STORE_DB_TRUST_SERVER_CERTIFICATE:-true}
+      PLF_STORE_SCHEMA_PATH: /app/db/schema/plf_db_agent_v2.sql
+      PLF_STORE_AUTO_APPLY_SCHEMA: "false"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

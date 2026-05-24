@@ -41,6 +41,10 @@ make test
 
 User chat orchestration can optionally call PGPT through the OpenAI-compatible Responses API. Configure it with `PGPT_BASE_URL`, `PGPT_MODEL`, and `PGPT_API_KEY`; see `docs/reference/pgpt-responses-api.md` for the supported parameter allowlist and safety limits.
 
+## Platform store configuration
+
+FastAPI platform persistence uses `PLF_STORE_*` variables from `.env.example`. These settings are for the PLF platform store only, not customer or business MSSQL. The default local target is the Docker MSSQL instance on `127.0.0.1:1433`; `PLF_STORE_SCHEMA_PATH` points to `db/schema/plf_db_agent_v2.sql`, and `PLF_STORE_AUTO_APPLY_SCHEMA` defaults to `false` so schema application stays explicit.
+
 ## First Codex goal
 
 ```text

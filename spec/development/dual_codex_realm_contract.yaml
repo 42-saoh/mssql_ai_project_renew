@@ -18,7 +18,7 @@ developmentRealm:
     - TOOLS.md
   config: .codex/config.toml
   configExpectations:
-    approval_policy: on-request
+    approval_policy: never
     sandbox_mode: workspace-write
     allow_login_shell: false
     features.goals: true

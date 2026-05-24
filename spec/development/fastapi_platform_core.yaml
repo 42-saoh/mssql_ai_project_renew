@@ -1,0 +1,86 @@
+version: 0.1.0
+service: fastapiPlatformCore
+scope: g03-fastapi-platform-core
+
+apiBoundary:
+  appFactory: apps/api/api_app/main.py:create_app
+  routeModules:
+    - apps/api/api_app/routes/health.py
+    - apps/api/api_app/routes/chat_runs.py
+    - apps/api/api_app/routes/conversations.py
+    - apps/api/api_app/routes/artifacts.py
+    - apps/api/api_app/routes/metadata.py
+    - apps/api/api_app/routes/approvals.py
+  openapiContract: spec/openapi/plf_db_agent_v2_openapi.yaml
+  streamlitMayCall: FastAPI only
+  directDbCallsFromStreamlitAllowed: false
+  directRunnerCallsFromStreamlitAllowed: false
+
+repositories:
+  conversation: apps/api/api_app/repositories/conversation_repository.py
+  run: apps/api/api_app/repositories/run_repository.py
+  artifact: apps/api/api_app/repositories/artifact_repository.py
+  validation: apps/api/api_app/repositories/validation_repository.py
+  approval: apps/api/api_app/repositories/approval_repository.py
+  evidence: apps/api/api_app/repositories/evidence_repository.py
+
+services:
+  chat: apps/api/api_app/services/chat_service.py
+  artifact: apps/api/api_app/services/artifact_service.py
+  codexRunnerGateway: apps/api/api_app/services/codex_runner_client.py
+  metadataGateway: apps/api/api_app/services/metadata_service.py
+  approval: apps/api/api_app/services/approval_service.py
+  persistenceSafety: apps/api/api_app/services/persistence_safety.py
+
+settings:
+  module: apps/api/api_app/settings.py
+  platformStoreEnv:
+    dialect: PLF_STORE_DB_DIALECT
+    host: PLF_STORE_DB_HOST
+    port: PLF_STORE_DB_PORT
+    name: PLF_STORE_DB_NAME
+    user: PLF_STORE_DB_USER
+    password: PLF_STORE_DB_PASSWORD
+    driver: PLF_STORE_DB_DRIVER
+    encrypt: PLF_STORE_DB_ENCRYPT
+    trustServerCertificate: PLF_STORE_DB_TRUST_SERVER_CERTIFICATE
+    schemaPath: PLF_STORE_SCHEMA_PATH
+    autoApplySchema: PLF_STORE_AUTO_APPLY_SCHEMA
+  storeAutoApplySchemaDefault: false
+  storePasswordReprAllowed: false
+
+persistenceControls:
+  sanitizedChatSummaryOnly: true
+  rawUserMessageStored: false
+  rawPromptStored: false
+  rawProviderResponseStored: false
+  rawStoredProcedureStored: false
+  rowDataStored: false
+  secretsStored: false
+  artifactContentStoredInline: false
+  artifactContentRefRequired: true
+  artifactContentHashRequired: true
+  validationRequiredBeforeArtifactPersistence: true
+  productionReadyArtifactPersistenceAllowed: false
+  reviewMarkersRequired: true
+
+runnerBoundary:
+  submitRoute: codex_runner
+  actualRuntimeExecutionInG03: false
+  submittedRunStatus: SUBMITTED
+  outputSchemaName: service_codex_run_result.schema.json
+  runtimeProfile: runtime-readonly
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g03_fastapi_platform_core.py
+    - tests/unit/api/test_g03_platform_services.py
+    - tests/integration/test_g03_api_persistence.py
+    - tests/security/test_g03_sanitized_persistence.py
+    - tests/eval/test_g03_platform_core_eval.py
+
+evalCases:
+  v2_storage_redaction:
+    - g03_api_persistence_sanitizes_chat_and_artifacts
+  v2_blocked_request_paths:
+    - g03_blocked_api_requests_do_not_submit_runner_or_artifacts

@@ -1,12 +1,15 @@
-CREATE TABLE codex_runs (
-  codex_run_id TEXT PRIMARY KEY,
-  chat_run_id TEXT NOT NULL,
-  run_type TEXT NOT NULL,
-  runtime_profile TEXT NOT NULL,
-  workspace_id TEXT NOT NULL,
-  status TEXT NOT NULL,
-  output_schema_name TEXT NOT NULL,
-  validation_status TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  completed_at TEXT
-);
+IF OBJECT_ID(N'dbo.codex_runs', N'U') IS NULL
+BEGIN
+  CREATE TABLE dbo.codex_runs (
+    codex_run_id NVARCHAR(64) NOT NULL CONSTRAINT pk_codex_runs PRIMARY KEY,
+    chat_run_id NVARCHAR(64) NOT NULL,
+    run_type NVARCHAR(64) NOT NULL,
+    runtime_profile NVARCHAR(128) NOT NULL,
+    workspace_id NVARCHAR(128) NOT NULL,
+    status NVARCHAR(64) NOT NULL,
+    output_schema_name NVARCHAR(128) NOT NULL,
+    validation_status NVARCHAR(64) NOT NULL,
+    created_at DATETIME2(3) NOT NULL,
+    completed_at DATETIME2(3) NULL
+  );
+END;

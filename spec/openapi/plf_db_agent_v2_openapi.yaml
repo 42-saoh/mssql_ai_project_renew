@@ -274,13 +274,17 @@ components:
       additionalProperties: true
     ArtifactProposal:
       type: object
-      required: [artifactType, title, contentMarkdown, evidenceRefs, reviewMarkers]
+      required: [artifactId, artifactType, title, contentRef, contentHash, evidenceRefs, reviewMarkers, productionReady, reviewRequired]
       properties:
+        artifactId:
+          type: string
         artifactType:
           $ref: "#/components/schemas/ArtifactType"
         title:
           type: string
-        contentMarkdown:
+        contentRef:
+          type: string
+        contentHash:
           type: string
         evidenceRefs:
           type: array
@@ -292,6 +296,10 @@ components:
             type: string
         productionReady:
           const: false
+        reviewRequired:
+          const: true
+        createdAt:
+          type: string
       additionalProperties: true
     RunnerArtifactProposal:
       type: object
@@ -330,13 +338,7 @@ components:
           items:
             $ref: "#/components/schemas/ArtifactProposal"
     ArtifactDetail:
-      allOf:
-        - $ref: "#/components/schemas/ArtifactProposal"
-        - type: object
-          required: [artifactId]
-          properties:
-            artifactId:
-              type: string
+      $ref: "#/components/schemas/ArtifactProposal"
     MetadataSearchResponse:
       type: object
       required: [ok, toolName, data]
