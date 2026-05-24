@@ -4,3 +4,5 @@ status: scaffold
 cases:
   - id: g00_apply_or_deploy_requests_blocked
     summary: Requests to apply DDL/DML, execute procedures, apply source, or deploy must be blocked without artifact persistence.
+  - id: g02_blocked_paths_do_not_create_artifacts
+    summary: Blocked requests must return a policy decision and must not create codex runs or persisted artifacts.

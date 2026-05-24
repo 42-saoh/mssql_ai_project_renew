@@ -55,3 +55,5 @@ cases:
   - name: streamlit_design_files_exist
   - name: streamlit_uses_fastapi_client_only
   - name: unsafe_action_labels_absent
+  - id: g02_streamlit_api_only_contract_baseline
+    summary: Streamlit contracts must preserve the FastAPI-only boundary declared in the API and UI specs.

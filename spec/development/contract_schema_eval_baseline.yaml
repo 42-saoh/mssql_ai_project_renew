@@ -1,0 +1,173 @@
+version: 0.1.0
+service: contractSchemaEvalBaseline
+scope: g02-contract-schema-eval-baseline
+
+openapi:
+  path: spec/openapi/plf_db_agent_v2_openapi.yaml
+  version: 3.1.0
+  requiredPaths:
+    - /health
+    - /api/v1/chat-runs
+    - /api/v1/chat-runs/{chatRunId}
+    - /api/v1/chat-runs/{chatRunId}/resume
+    - /api/v1/conversations/{conversationId}
+    - /api/v1/artifacts
+    - /api/v1/artifacts/{artifactId}
+    - /api/v1/metadata/search
+    - /api/v1/metadata/ready
+    - /api/v1/metadata/tools
+    - /api/v1/metadata/tools/{toolName}/invoke
+    - /api/v1/metadata/db-profiles
+    - /api/v1/approvals/{approvalId}/resume
+  requiredSchemas:
+    - ChatRunCreate
+    - ChatRunResponse
+    - ArtifactProposal
+    - MetadataSearchResponse
+    - MetadataToolInvokeRequest
+    - ServiceCodexRunRequest
+    - ServiceCodexRunResult
+  implementedPathSubset:
+    - /health
+    - /api/v1/chat-runs
+    - /api/v1/chat-runs/{chatRunId}
+    - /api/v1/chat-runs/{chatRunId}/resume
+    - /api/v1/artifacts
+    - /api/v1/artifacts/{artifactId}
+    - /api/v1/metadata/search
+    - /api/v1/metadata/ready
+    - /api/v1/metadata/tools
+    - /api/v1/metadata/tools/{toolName}/invoke
+    - /api/v1/metadata/db-profiles
+
+runnerSchemas:
+  request:
+    path: spec/codex-runner/service_codex_run_request.schema.json
+    schemaVersion: ServiceCodexRunRequest.v1
+    runTypes:
+      - SP_ANALYSIS
+      - DEPENDENCY_ANALYSIS
+      - TABLE_DESIGN
+      - DRAFT_GENERATION
+    toolModes:
+      - EVIDENCE_BUNDLE_ONLY
+      - SCOPED_TOOL_PROXY
+    skillNamePattern: "^runtime-"
+  result:
+    path: spec/codex-runner/service_codex_run_result.schema.json
+    schemaVersion: ServiceCodexRunResult.v1
+    statuses:
+      - SUCCEEDED
+      - FAILED
+      - BLOCKED
+      - REVIEW_REQUIRED
+    productionReady: false
+    validationKeys:
+      - schemaValid
+      - policyValid
+      - staticValidationPassed
+
+artifactSchemas:
+  allowedPublicArtifactTypes:
+    - SP_ANALYSIS_DOC
+    - DEPENDENCY_REPORT
+    - DTO_DRAFT
+    - SERVICE_DRAFT
+    - MAPPER_INTERFACE
+    - MAPPER_XML
+  retiredPublicArtifactTypes:
+    - DDL_DRAFT
+    - VO_DRAFT
+    - MODEL_DRAFT
+  previewOnlyArtifactTypes:
+    - TABLE_DESIGN_PREVIEW
+  paths:
+    - spec/artifacts/sp_analysis_doc.schema.json
+    - spec/artifacts/dependency_report.schema.json
+    - spec/artifacts/table_design_preview.schema.json
+    - spec/artifacts/java_mybatis_draft_pack.schema.json
+  requiredArtifactFields:
+    - artifactType
+    - title
+    - contentMarkdown
+    - evidenceRefs
+    - reviewMarkers
+
+dbSchema:
+  path: db/schema
+  migrationFiles:
+    - db/schema/v001_platform_core.sql
+    - db/schema/v002_artifacts.sql
+    - db/schema/v003_codex_runs.sql
+    - db/schema/v004_approvals.sql
+    - db/schema/v005_evidence_bundles.sql
+  requiredTables:
+    - conversations
+    - chat_runs
+    - artifacts
+    - artifact_validations
+    - codex_runs
+    - approval_requests
+    - evidence_bundles
+  requiredStorageControls:
+    artifacts:
+      - production_ready INTEGER NOT NULL DEFAULT 0
+      - review_required INTEGER NOT NULL DEFAULT 1
+    artifact_validations:
+      - schema_valid INTEGER NOT NULL
+      - policy_valid INTEGER NOT NULL
+      - static_valid INTEGER NOT NULL
+  forbiddenStorageFields:
+    - raw_prompt
+    - raw_provider_response
+    - raw_sp
+    - row_data
+    - secret
+    - password
+    - api_key
+    - token
+
+evalBaseline:
+  suites:
+    - v2_cross_realm_boundary
+    - v2_domain_guard
+    - v2_intent_routing
+    - v2_runner_policy
+    - v2_runner_output_schema
+    - v2_storage_redaction
+    - v2_artifact_quality
+    - v2_mssql_mcp_readonly
+    - v2_streamlit_api_only
+    - v2_end_to_end_happy_paths
+    - v2_blocked_request_paths
+  requiredCases:
+    v2_domain_guard:
+      - g02_general_chat_blocked_baseline
+    v2_intent_routing:
+      - g02_supported_intents_route_to_expected_paths
+    v2_runner_policy:
+      - g02_runner_policy_blocks_unsafe_outputs
+    v2_runner_output_schema:
+      - g02_runner_result_schema_contract_validation
+    v2_storage_redaction:
+      - g02_storage_schema_omits_raw_payload_columns
+    v2_artifact_quality:
+      - g02_artifact_schema_requires_evidence_and_review_markers
+    v2_mssql_mcp_readonly:
+      - g02_metadata_tool_catalog_readonly_contract
+    v2_streamlit_api_only:
+      - g02_streamlit_api_only_contract_baseline
+    v2_end_to_end_happy_paths:
+      - g02_happy_path_contract_matrix_defined
+    v2_blocked_request_paths:
+      - g02_blocked_paths_do_not_create_artifacts
+
+safetyInvariants:
+  - no row data persistence
+  - no stored procedure execution
+  - no DDL/DML apply
+  - no source apply
+  - no deploy
+  - no raw prompt/provider response storage
+  - validation gate controls artifact persistence
+  - Service Codex Runner returns proposals only

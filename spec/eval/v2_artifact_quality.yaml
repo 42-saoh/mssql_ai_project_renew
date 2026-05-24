@@ -10,3 +10,5 @@ cases:
     summary: Dependency evidence claims must include source refs and uncertainty caveats.
   - id: g00_table_design_preview_no_apply_language
     summary: Table design previews must not imply automatic DDL application.
+  - id: g02_artifact_schema_requires_evidence_and_review_markers
+    summary: Artifact schemas must require evidenceRefs and reviewMarkers so generated content remains reviewable.

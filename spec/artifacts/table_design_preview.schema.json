@@ -20,5 +20,6 @@
     "blockedFromAutoApply": {
       "const": true
     }
-  }
+  },
+  "additionalProperties": true
 }

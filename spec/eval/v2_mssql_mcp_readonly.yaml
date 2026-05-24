@@ -4,3 +4,5 @@ status: scaffold
 cases:
   - id: g00_no_row_data_or_sp_execution_tools
     summary: MSSQL MCP tool access must block row-data queries, free SQL, stored procedure execution, DDL/DML apply, source apply, and deploy.
+  - id: g02_metadata_tool_catalog_readonly_contract
+    summary: Metadata tool catalog must distinguish read-only evidence tools from blocked execution or mutation tools.

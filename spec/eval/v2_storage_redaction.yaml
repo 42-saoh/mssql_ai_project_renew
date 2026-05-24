@@ -4,3 +4,5 @@ status: scaffold
 cases:
   - id: g00_raw_payloads_not_persisted
     summary: Raw prompts, provider responses, SP definitions, row data, and secrets must be rejected before storage.
+  - id: g02_storage_schema_omits_raw_payload_columns
+    summary: PLF storage schema must avoid raw prompt, provider response, stored procedure definition, row data, and secret columns.

@@ -1,4 +1,6 @@
 name: v2_end_to_end_happy_paths
 summary: Supported user flows complete with expected artifacts or metadata responses.
 status: scaffold
-cases: []
+cases:
+  - id: g02_happy_path_contract_matrix_defined
+    summary: End-to-end happy-path evals must cover chat-to-runner, chat-to-metadata, artifact lookup, and blocked request flows once implementation is available.

@@ -2,64 +2,508 @@ openapi: 3.1.0
 info:
   title: PLF DB Agent V2 API
   version: 0.1.0
+  description: Contract-first API baseline for DB-analysis chat, metadata, artifacts, and approvals.
 paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
   /api/v1/chat-runs:
     post:
       summary: Create chat run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRunCreate"
       responses:
-        '200': { description: Chat run accepted }
+        "200":
+          description: Chat run accepted or blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatRunResponse"
   /api/v1/chat-runs/{chatRunId}:
     get:
       summary: Get chat run
+      parameters:
+        - $ref: "#/components/parameters/ChatRunId"
       responses:
-        '200': { description: Chat run }
+        "200":
+          description: Chat run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatRunStatus"
   /api/v1/chat-runs/{chatRunId}/resume:
     post:
       summary: Resume interrupted chat run
+      parameters:
+        - $ref: "#/components/parameters/ChatRunId"
       responses:
-        '200': { description: Resumed }
+        "200":
+          description: Resumed chat run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatRunStatus"
   /api/v1/conversations/{conversationId}:
     get:
       summary: Get conversation
+      parameters:
+        - $ref: "#/components/parameters/ConversationId"
       responses:
-        '200': { description: Conversation }
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
   /api/v1/artifacts:
     get:
       summary: List artifacts
       responses:
-        '200': { description: Artifact list }
+        "200":
+          description: Artifact list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactList"
   /api/v1/artifacts/{artifactId}:
     get:
       summary: Get artifact
+      parameters:
+        - $ref: "#/components/parameters/ArtifactId"
       responses:
-        '200': { description: Artifact }
+        "200":
+          description: Artifact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactDetail"
   /api/v1/metadata/search:
     get:
       summary: Search read-only metadata
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: dbProfileId
+          in: query
+          required: false
+          schema:
+            type: string
+            default: master
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
-        '200': { description: Metadata results }
+        "200":
+          description: Metadata results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetadataSearchResponse"
   /api/v1/metadata/ready:
     get:
       summary: Check external MSSQL MCP readiness
       responses:
-        '200': { description: External metadata gateway readiness }
+        "200":
+          description: External metadata gateway readiness
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetadataReadyResponse"
   /api/v1/metadata/tools:
     get:
       summary: List runtime-discovered external MSSQL MCP tools
       responses:
-        '200': { description: External metadata tool catalog }
+        "200":
+          description: External metadata tool catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetadataToolCatalog"
   /api/v1/metadata/tools/{toolName}/invoke:
     post:
       summary: Invoke an external read-only MSSQL MCP tool
+      parameters:
+        - name: toolName
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetadataToolInvokeRequest"
       responses:
-        '200': { description: Tool invocation response or safe platform error }
+        "200":
+          description: Tool invocation response or safe platform error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetadataToolInvokeResponse"
   /api/v1/metadata/db-profiles:
     get:
       summary: List external MSSQL MCP database profiles
       responses:
-        '200': { description: External database profile registry }
+        "200":
+          description: External database profile registry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbProfileList"
   /api/v1/approvals/{approvalId}/resume:
     post:
       summary: Resume approval flow
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
-        '200': { description: Approval resumed }
+        "200":
+          description: Approval resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalResumeResponse"
+components:
+  parameters:
+    ChatRunId:
+      name: chatRunId
+      in: path
+      required: true
+      schema:
+        type: string
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema:
+        type: string
+    ArtifactId:
+      name: artifactId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+    ChatRunCreate:
+      type: object
+      required: [message]
+      additionalProperties: false
+      properties:
+        conversationId:
+          type: [string, "null"]
+        message:
+          type: string
+          minLength: 1
+        actorId:
+          type: [string, "null"]
+    ChatRunResponse:
+      type: object
+      required: [chatRunId, conversationId, status, intent, route, policyDecision]
+      properties:
+        chatRunId:
+          type: string
+        conversationId:
+          type: string
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        intent:
+          $ref: "#/components/schemas/Intent"
+        route:
+          type: string
+        policyDecision:
+          type: string
+        pgptUsed:
+          type: boolean
+        pgptModel:
+          type: [string, "null"]
+        pgptFallbackReason:
+          type: [string, "null"]
+      additionalProperties: true
+    ChatRunStatus:
+      type: object
+      required: [chatRunId, status]
+      properties:
+        chatRunId:
+          type: string
+        status:
+          type: string
+      additionalProperties: true
+    Conversation:
+      type: object
+      required: [conversationId]
+      properties:
+        conversationId:
+          type: string
+        title:
+          type: [string, "null"]
+        items:
+          type: array
+          items:
+            type: object
+      additionalProperties: true
+    ArtifactProposal:
+      type: object
+      required: [artifactType, title, contentMarkdown, evidenceRefs, reviewMarkers]
+      properties:
+        artifactType:
+          $ref: "#/components/schemas/ArtifactType"
+        title:
+          type: string
+        contentMarkdown:
+          type: string
+        evidenceRefs:
+          type: array
+          items:
+            type: string
+        reviewMarkers:
+          type: array
+          items:
+            type: string
+        productionReady:
+          const: false
+      additionalProperties: true
+    RunnerArtifactProposal:
+      type: object
+      required: [artifactType, title, contentMarkdown, evidenceRefs, reviewMarkers]
+      properties:
+        artifactType:
+          enum:
+            - SP_ANALYSIS_DOC
+            - DEPENDENCY_REPORT
+            - DTO_DRAFT
+            - SERVICE_DRAFT
+            - MAPPER_INTERFACE
+            - MAPPER_XML
+            - TABLE_DESIGN_PREVIEW
+        title:
+          type: string
+        contentMarkdown:
+          type: string
+        evidenceRefs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        reviewMarkers:
+          type: array
+          minItems: 1
+          items:
+            type: string
+      additionalProperties: true
+    ArtifactList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactProposal"
+    ArtifactDetail:
+      allOf:
+        - $ref: "#/components/schemas/ArtifactProposal"
+        - type: object
+          required: [artifactId]
+          properties:
+            artifactId:
+              type: string
+    MetadataSearchResponse:
+      type: object
+      required: [ok, toolName, data]
+      properties:
+        ok:
+          type: boolean
+        toolName:
+          const: search_metadata_objects
+        data:
+          type: object
+      additionalProperties: true
+    MetadataReadyResponse:
+      type: object
+      required: [ready]
+      properties:
+        ready:
+          type: boolean
+      additionalProperties: true
+    MetadataToolCatalog:
+      type: object
+      required: [tools]
+      properties:
+        tools:
+          type: array
+          items:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+              readOnly:
+                type: boolean
+            additionalProperties: true
+    MetadataToolInvokeRequest:
+      type: object
+      required: [arguments]
+      additionalProperties: false
+      properties:
+        arguments:
+          type: object
+    MetadataToolInvokeResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        toolName:
+          type: string
+        data:
+          type: object
+      additionalProperties: true
+    DbProfileList:
+      type: object
+      required: [profiles]
+      properties:
+        profiles:
+          type: array
+          items:
+            type: object
+      additionalProperties: true
+    ApprovalResumeResponse:
+      type: object
+      required: [approvalId, status]
+      properties:
+        approvalId:
+          type: string
+        status:
+          type: string
+      additionalProperties: true
+    ServiceCodexRunRequest:
+      type: object
+      required: [schemaVersion, runType, chatRunId, conversationId, target, policy, toolMode, skillAllowlist, outputSchema]
+      properties:
+        schemaVersion:
+          const: ServiceCodexRunRequest.v1
+        runType:
+          enum: [SP_ANALYSIS, DEPENDENCY_ANALYSIS, TABLE_DESIGN, DRAFT_GENERATION]
+        chatRunId:
+          type: string
+        conversationId:
+          type: string
+        target:
+          type: object
+          required: [dbProfileId, objectType, schema, name, targetKey]
+          properties:
+            dbProfileId:
+              type: string
+            objectType:
+              type: string
+            schema:
+              type: string
+            name:
+              type: string
+            targetKey:
+              type: string
+        policy:
+          type: object
+        toolMode:
+          enum: [EVIDENCE_BUNDLE_ONLY, SCOPED_TOOL_PROXY]
+        skillAllowlist:
+          type: array
+          items:
+            type: string
+            pattern: "^runtime-"
+        outputSchema:
+          type: string
+        evidenceBundleRef:
+          type: string
+      additionalProperties: false
+    ServiceCodexRunResult:
+      type: object
+      required: [schemaVersion, runType, targetKey, status, productionReady, reviewRequired, artifactProposals, blockers, validation]
+      properties:
+        schemaVersion:
+          const: ServiceCodexRunResult.v1
+        runType:
+          enum: [SP_ANALYSIS, DEPENDENCY_ANALYSIS, TABLE_DESIGN, DRAFT_GENERATION]
+        targetKey:
+          type: string
+        status:
+          enum: [SUCCEEDED, FAILED, BLOCKED, REVIEW_REQUIRED]
+        productionReady:
+          const: false
+        reviewRequired:
+          type: boolean
+        artifactProposals:
+          type: array
+          items:
+            $ref: "#/components/schemas/RunnerArtifactProposal"
+        blockers:
+          type: array
+          items:
+            type: string
+        validation:
+          type: object
+          required: [schemaValid, policyValid, staticValidationPassed]
+          properties:
+            schemaValid:
+              type: boolean
+            policyValid:
+              type: boolean
+            staticValidationPassed:
+              type: boolean
+      additionalProperties: true
+    Intent:
+      enum:
+        - SP_ANALYSIS
+        - METADATA_SEARCH
+        - DEPENDENCY_ANALYSIS
+        - TABLE_DESIGN
+        - DRAFT_GENERATION
+        - HISTORY_LOOKUP
+        - BLOCKED_OR_APPROVAL_REQUIRED
+        - BLOCKED
+    ArtifactType:
+      enum:
+        - SP_ANALYSIS_DOC
+        - DEPENDENCY_REPORT
+        - DTO_DRAFT
+        - SERVICE_DRAFT
+        - MAPPER_INTERFACE
+        - MAPPER_XML
+    RunStatus:
+      enum:
+        - ACCEPTED
+        - RUNNING
+        - SUCCEEDED
+        - FAILED
+        - BLOCKED
+        - REVIEW_REQUIRED

@@ -1,4 +1,6 @@
 name: v2_domain_guard
 summary: General non-DB requests must be blocked.
 status: scaffold
-cases: []
+cases:
+  - id: g02_general_chat_blocked_baseline
+    summary: General non-DB chat must resolve to BLOCKED without PGPT, runner, metadata, or artifact persistence.

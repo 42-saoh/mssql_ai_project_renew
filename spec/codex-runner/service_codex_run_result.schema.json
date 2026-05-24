@@ -43,7 +43,51 @@
       "type": "boolean"
     },
     "artifactProposals": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "artifactType",
+          "title",
+          "contentMarkdown",
+          "evidenceRefs",
+          "reviewMarkers"
+        ],
+        "properties": {
+          "artifactType": {
+            "enum": [
+              "SP_ANALYSIS_DOC",
+              "DEPENDENCY_REPORT",
+              "DTO_DRAFT",
+              "SERVICE_DRAFT",
+              "MAPPER_INTERFACE",
+              "MAPPER_XML",
+              "TABLE_DESIGN_PREVIEW"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "contentMarkdown": {
+            "type": "string"
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "reviewMarkers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": true
+      }
     },
     "blockers": {
       "type": "array",
@@ -52,7 +96,24 @@
       }
     },
     "validation": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "schemaValid",
+        "policyValid",
+        "staticValidationPassed"
+      ],
+      "properties": {
+        "schemaValid": {
+          "type": "boolean"
+        },
+        "policyValid": {
+          "type": "boolean"
+        },
+        "staticValidationPassed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
     }
   },
   "additionalProperties": true

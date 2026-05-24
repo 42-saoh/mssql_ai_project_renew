@@ -46,3 +46,9 @@ The boundary is contract-first:
   are not shared across realms.
 - The machine-readable contract is
   `spec/development/dual_codex_realm_contract.yaml`.
+
+## Contract / Schema / Eval Baseline
+
+G02 defines API, runner output, artifact, storage, and eval baseline contracts
+before implementation work depends on them. The machine-readable contract is
+`spec/development/contract_schema_eval_baseline.yaml`.

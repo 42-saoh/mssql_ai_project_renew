@@ -29,13 +29,15 @@
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "minItems": 1
     },
     "reviewMarkers": {
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "minItems": 1
     }
   },
   "additionalProperties": true

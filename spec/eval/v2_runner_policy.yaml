@@ -4,3 +4,5 @@ status: scaffold
 cases:
   - id: g00_no_executable_operation_language
     summary: Runner proposals must not instruct users or systems to execute SQL, stored procedures, DDL/DML, source apply, or deploy.
+  - id: g02_runner_policy_blocks_unsafe_outputs
+    summary: Runner policy validation must reject raw payloads, retired artifact types, production-ready outputs, and executable apply instructions.

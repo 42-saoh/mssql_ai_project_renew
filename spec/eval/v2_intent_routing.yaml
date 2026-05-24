@@ -1,4 +1,6 @@
 name: v2_intent_routing
 summary: Supported DB analysis intents route to the correct execution path.
 status: scaffold
-cases: []
+cases:
+  - id: g02_supported_intents_route_to_expected_paths
+    summary: SP analysis, dependency analysis, table design, draft generation, metadata search, and history lookup intents must route to their approved platform boundaries.

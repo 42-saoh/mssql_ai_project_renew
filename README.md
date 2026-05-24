@@ -22,6 +22,11 @@ This repository is intentionally **not** a migration of the legacy project. The 
 The two realms must never share docs, config, skills, workspaces, credentials, or audit boundaries.
 The enforceable boundary contract is `spec/development/dual_codex_realm_contract.yaml`.
 
+## Contract baselines
+
+- Dual Codex Realm: `spec/development/dual_codex_realm_contract.yaml`
+- OpenAPI, schemas, DB schema, and eval baseline: `spec/development/contract_schema_eval_baseline.yaml`
+
 ## Start development
 
 ```bash
