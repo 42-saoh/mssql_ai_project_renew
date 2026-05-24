@@ -1,0 +1,130 @@
+.agent-card {
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: none;
+}
+
+.agent-card-soft {
+  background: #f3f3f3;
+  border: 1px solid #e2e2e2;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: none;
+}
+
+.agent-card-elevated {
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: rgba(0, 0, 0, 0.12) 0px 4px 16px 0px;
+}
+
+.agent-dark-band {
+  background: #000000;
+  color: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.agent-muted {
+  color: #5e5e5e;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.agent-caption {
+  color: #8a8a8a;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.agent-badge-draft,
+.agent-badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.agent-badge-success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.agent-badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.agent-badge-info {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.agent-code-label {
+  color: #5e5e5e;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.agent-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 24px;
+}
+
+.agent-status-item {
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.agent-status-label {
+  color: #8a8a8a;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.agent-status-value {
+  color: #000000;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.agent-section-title {
+  color: #000000;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+  margin-bottom: 8px;
+}
+
+.agent-preview-empty {
+  background: #f3f3f3;
+  border: 1px solid #e2e2e2;
+  border-radius: 16px;
+  padding: 24px;
+  color: #5e5e5e;
+}
+
+@media (max-width: 900px) {
+  .agent-status-grid {
+    grid-template-columns: 1fr;
+  }
+}

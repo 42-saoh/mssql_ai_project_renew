@@ -1,0 +1,67 @@
+version: 0.1.0
+service: streamlitDesignContract
+source: DESIGN.md
+realm: Development Codex
+target: apps/streamlit
+
+required:
+  readBeforeChanging:
+    - Streamlit screen
+    - CSS
+    - layout
+    - form
+    - chart
+    - generated-output preview
+  themeConfigPath: .streamlit/config.toml
+  cssPath: styles/design.css
+  layout: wide
+  initialSidebarState: expanded
+
+theme:
+  primaryColor: "#000000"
+  backgroundColor: "#ffffff"
+  secondaryBackgroundColor: "#f3f3f3"
+  textColor: "#000000"
+  linkColor: "#0000ee"
+  buttonRadius: 999px
+
+cssUtilities:
+  - agent-card
+  - agent-card-soft
+  - agent-dark-band
+  - agent-muted
+  - agent-caption
+  - agent-badge
+  - agent-badge-draft
+  - agent-badge-warning
+  - agent-badge-success
+  - agent-badge-danger
+  - agent-badge-info
+  - agent-code-label
+
+apiBoundary:
+  streamlitMayCall: FastAPI only
+  allowedClient: apps.streamlit.client.api_client.ApiClient
+  forbiddenDirectCalls:
+    - DB
+    - MSSQL MCP
+    - Metadata Gateway
+    - Service Codex Runner
+
+generatedOutputPolicy:
+  requiredReviewStates:
+    - DRAFT
+    - MANUAL REVIEW REQUIRED
+    - VALIDATED
+    - BLOCKED
+    - FAILED
+  forbiddenUnsafeLabels:
+    - Execute SQL
+    - Apply DDL
+    - Deploy
+    - Run stored procedure
+    - Auto-fix database
+    - Overwrite source
+
+realmBoundary:
+  designMdInheritedByRuntimeTemplate: false

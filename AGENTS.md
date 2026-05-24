@@ -33,6 +33,9 @@ Every goal must include:
 - Contract-first.
 - Eval-first.
 - Policy-first.
+- For Streamlit UI, CSS, layout, form, chart, or generated-output preview changes, read root `DESIGN.md` first and follow it as the authoritative UI design contract.
+- Use `.agents/skills/context7-docs` only when current framework, library, API, configuration, migration, or CLI documentation is needed; do not send secrets, credentials, connection strings, raw prompts, provider responses, or large proprietary code to external documentation tools.
+- Use `.agents/skills/browser-automation-smoke` only for non-destructive Playwright smoke checks against localhost or approved dev/test URLs; do not commit cookies, tokens, screenshots, traces, or storage state.
 - Keep implementation small and explicit.
 - Add tests with each behavior change.
 - Avoid hidden side effects.

@@ -1,4 +1,57 @@
 name: v2_streamlit_api_only
-summary: Streamlit may call FastAPI only.
+summary: Streamlit may call FastAPI only and must follow the root DESIGN.md UI contract.
 status: scaffold
-cases: []
+designContract:
+  source: DESIGN.md
+  appliesTo:
+    - apps/streamlit
+    - .streamlit/config.toml
+    - styles/design.css
+  requiredFiles:
+    - DESIGN.md
+    - .streamlit/config.toml
+    - styles/design.css
+  requiredTheme:
+    primaryColor: "#000000"
+    backgroundColor: "#ffffff"
+    secondaryBackgroundColor: "#f3f3f3"
+    buttonRadius: 999px
+  requiredCssClasses:
+    - agent-card
+    - agent-card-soft
+    - agent-dark-band
+    - agent-badge
+    - agent-badge-draft
+    - agent-badge-warning
+    - agent-badge-success
+    - agent-badge-danger
+    - agent-badge-info
+    - agent-code-label
+apiBoundary:
+  allowedClient: apps.streamlit.client.api_client.ApiClient
+  forbiddenDirectCalls:
+    - DB
+    - MSSQL MCP
+    - Metadata Gateway
+    - Service Codex Runner
+  forbiddenPorts:
+    - "8010"
+    - "8100"
+uiSmoke:
+  tool: Playwright
+  sourceSkill: browser-automation-smoke
+  defaultEnabled: false
+  envFlag: PLF_PLAYWRIGHT_SMOKE_ENABLED
+  baseUrlEnv: PLAYWRIGHT_BASE_URL
+  purpose: Non-destructive local Streamlit UI verification only; it does not permit direct DB, MCP, Metadata Gateway, or Service Codex Runner calls.
+forbiddenUnsafeLabels:
+  - Execute SQL
+  - Apply DDL
+  - Deploy
+  - Run stored procedure
+  - Auto-fix database
+  - Overwrite source
+cases:
+  - name: streamlit_design_files_exist
+  - name: streamlit_uses_fastapi_client_only
+  - name: unsafe_action_labels_absent

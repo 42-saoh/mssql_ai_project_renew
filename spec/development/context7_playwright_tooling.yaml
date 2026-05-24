@@ -1,0 +1,68 @@
+version: 0.1.0
+service: developmentTooling
+scope: development-only
+defaultEnabled: false
+
+sourceSkills:
+  context7: .agents/skills/context7-docs/SKILL.md
+  playwright: .agents/skills/browser-automation-smoke/SKILL.md
+
+context7:
+  purpose: Up-to-date external framework, library, API, configuration, migration, and CLI documentation lookup.
+  activation:
+    allRequired:
+      PLF_ENVIRONMENT: dev
+      PLF_CONTEXT7_ENABLED: "true"
+      CONTEXT7_API_KEY: present
+  environment:
+    requiredWhenEnabled:
+      - CONTEXT7_API_KEY
+    localFlags:
+      PLF_CONTEXT7_ENABLED: "false"
+  forbiddenData:
+    - secrets
+    - credentials
+    - connection strings
+    - raw prompts
+    - raw provider responses
+    - stored procedure definitions
+    - row data
+    - large proprietary code blobs
+
+playwright:
+  purpose: Non-destructive local UI smoke verification, screenshots, and happy-path checks.
+  activation:
+    allRequired:
+      PLF_ENVIRONMENT: dev
+      PLF_PLAYWRIGHT_SMOKE_ENABLED: "true"
+      PLAYWRIGHT_BASE_URL: present
+  environment:
+    optional:
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:8501
+      PLAYWRIGHT_BROWSER: chromium
+      PLAYWRIGHT_HEADLESS: "true"
+      PLAYWRIGHT_BROWSERS_PATH: ""
+    localFlags:
+      PLF_PLAYWRIGHT_SMOKE_ENABLED: "false"
+  smokeContract:
+    allowedTargets:
+      - localhost
+      - 127.0.0.1
+      - approved dev/test URL
+    destructiveActionsAllowed: false
+    realAccountsAllowed: false
+    productionTargetsAllowed: false
+    screenshotsCommitted: false
+    tracesCommitted: false
+    storageStateCommitted: false
+  forbiddenData:
+    - cookies
+    - tokens
+    - screenshots containing secrets
+    - traces containing secrets
+    - browser storage state
+    - production account data
+
+realmBoundary:
+  developmentCodexOnly: true
+  inheritedByServiceCodexRunnerRuntime: false
