@@ -47,3 +47,24 @@ Every goal must include:
 - A Service Codex Runner path can read root `.agents/skills` as runtime skills.
 - Streamlit directly calls DB, MCP, or Codex Runner.
 - Raw prompts, raw provider responses, raw SP definitions, row data, or secrets would be persisted.
+
+## Strict sequential goals workflow
+
+When the user asks to run goals in `goals/`, follow this contract:
+
+- Goal files are ordered lexicographically by filename: `G00`, `G01`, `G02`, ...
+- Never execute a later goal before all earlier goals are validated.
+- Execute exactly one goal at a time.
+- Before starting goal `GNN`, re-check all goals `G00` through `G(N-1)`.
+- If any previous goal is incomplete, broken, or inconsistent, return to the earliest failing goal and resume sequentially from there.
+- Treat previous goals as regression contracts.
+- Do not copy legacy implementation code.
+- Do not weaken blocked-operation policy.
+- Do not merge Development Codex and Service Codex Runner realms.
+- Streamlit calls FastAPI only.
+- Service Codex Runner returns proposals only.
+- Validation gate controls artifact persistence.
+- No row data, SP execution, DDL/DML apply, source apply, deploy, or raw prompt/provider storage.
+- Completion requires acceptance criteria, validation commands, and policy boundaries to pass.
+
+Prefer using `scripts/codex-strict-goal-runner.py` for unattended execution instead of relying on prompt-only sequencing.
