@@ -1,6 +1,4 @@
 name = "langgraph_engineer"
 description = "Builds intent, policy, route, checkpoint, and approval graph."
-profile = "dev-edit"
 
-[instructions]
-summary = "Operate only in the Development Codex Realm. Do not execute service runtime jobs unless the goal explicitly requires testing the runner boundary."
+developer_instructions = "Operate only in the Development Codex Realm. Do not execute service runtime jobs unless the goal explicitly requires testing the runner boundary."
