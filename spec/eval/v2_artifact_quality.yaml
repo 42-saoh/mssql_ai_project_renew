@@ -1,4 +1,12 @@
 name: v2_artifact_quality
 summary: Artifacts must contain evidence refs and visible review markers.
 status: scaffold
-cases: []
+cases:
+  - id: g00_no_fallback_skeleton_persistence
+    summary: Placeholder or fallback skeleton artifacts must not be persisted.
+  - id: g00_review_markers_visible
+    summary: REVIEW_REQUIRED markers must remain visible in persisted proposals.
+  - id: g00_dependency_evidence_requires_caveats
+    summary: Dependency evidence claims must include source refs and uncertainty caveats.
+  - id: g00_table_design_preview_no_apply_language
+    summary: Table design previews must not imply automatic DDL application.

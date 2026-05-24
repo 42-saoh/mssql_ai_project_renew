@@ -1,4 +1,6 @@
 name: v2_mssql_mcp_readonly
 summary: MSSQL MCP must expose only read-only metadata tools.
 status: scaffold
-cases: []
+cases:
+  - id: g00_no_row_data_or_sp_execution_tools
+    summary: MSSQL MCP tool access must block row-data queries, free SQL, stored procedure execution, DDL/DML apply, source apply, and deploy.

@@ -1,4 +1,6 @@
 name: v2_runner_output_schema
 summary: Runner outputs must validate against JSON schema.
 status: scaffold
-cases: []
+cases:
+  - id: g00_schema_invalid_runner_result_not_persisted
+    summary: Schema-invalid runner results must fail validation before artifact persistence.

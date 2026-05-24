@@ -1,4 +1,6 @@
 name: v2_runner_policy
 summary: Runner output must not include blocked operations or raw payloads.
 status: scaffold
-cases: []
+cases:
+  - id: g00_no_executable_operation_language
+    summary: Runner proposals must not instruct users or systems to execute SQL, stored procedures, DDL/DML, source apply, or deploy.

@@ -1,4 +1,6 @@
 name: v2_storage_redaction
 summary: Storage must not persist raw prompt, provider response, SP definitions, row data, or secrets.
 status: scaffold
-cases: []
+cases:
+  - id: g00_raw_payloads_not_persisted
+    summary: Raw prompts, provider responses, SP definitions, row data, and secrets must be rejected before storage.

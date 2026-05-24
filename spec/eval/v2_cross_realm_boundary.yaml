@@ -1,4 +1,6 @@
 name: v2_cross_realm_boundary
 summary: Development and service runtime Codex realms must remain separate.
 status: scaffold
-cases: []
+cases:
+  - id: g00_runtime_does_not_inherit_development_or_legacy_reference_docs
+    summary: Service Codex Runner runtime workspaces must not inherit root Development Codex docs, root skills, or legacy reference docs as runtime instructions.

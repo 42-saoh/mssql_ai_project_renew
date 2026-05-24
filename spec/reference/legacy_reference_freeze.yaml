@@ -1,0 +1,90 @@
+name: g00_legacy_reference_freeze
+schema_version: LegacyReferenceFreeze.v1
+status: frozen_reference
+scope:
+  legacy_material_status: reference_only
+  v2_source_status: greenfield
+  development_realm_root: "."
+  service_runtime_root: "services/codex-runner/runtime-template"
+allowed_reference_uses:
+  - product intent and terminology
+  - artifact taxonomy decisions
+  - policy boundary lessons
+  - eval and regression themes
+forbidden_uses:
+  - id: copy_implementation_modules
+    summary: Do not copy legacy implementation modules, services, routes, adapters, UI code, prompts, or migrations into V2.
+  - id: runtime_dependency
+    summary: Do not import, execute, package, or deploy legacy project code from V2.
+  - id: active_runtime_prompt_reuse
+    summary: Do not promote legacy prompt files into active V2 Development or Service Codex runtime files.
+  - id: realm_merge
+    summary: Do not let Service Codex Runner inherit root Development Codex docs, config, skills, credentials, or workspace state.
+policy_inheritance:
+  blocked_operations:
+    - no row-data query or display
+    - no stored procedure execution
+    - no free SQL execution
+    - no DDL or DML apply
+    - no automatic source apply
+    - no deploy
+    - no raw prompt persistence
+    - no raw provider response persistence
+    - no raw SP definition persistence
+    - no row data persistence
+    - no secret persistence
+    - no general chatbot answers outside DB analysis scope
+  required_controls:
+    - validation gate controls artifact persistence
+    - generated artifacts remain review-required
+    - Service Codex Runner returns proposals only
+    - Streamlit calls FastAPI only
+artifact_taxonomy:
+  allowed_public_artifact_types:
+    - SP_ANALYSIS_DOC
+    - DEPENDENCY_REPORT
+    - DTO_DRAFT
+    - SERVICE_DRAFT
+    - MAPPER_INTERFACE
+    - MAPPER_XML
+  retired_public_artifact_types:
+    - DDL_DRAFT
+    - VO_DRAFT
+    - MODEL_DRAFT
+  preview_only_artifact_types:
+    - TABLE_DESIGN_PREVIEW
+  required_artifact_controls:
+    - production_ready_false
+    - visible_review_required_markers
+    - evidence_references_for_claims
+eval_lessons:
+  - id: block_fallback_skeleton_artifacts
+    suite: v2_artifact_quality
+    case_id: g00_no_fallback_skeleton_persistence
+  - id: block_schema_invalid_runner_results
+    suite: v2_runner_output_schema
+    case_id: g00_schema_invalid_runner_result_not_persisted
+  - id: block_raw_payload_leakage
+    suite: v2_storage_redaction
+    case_id: g00_raw_payloads_not_persisted
+  - id: require_visible_review_markers
+    suite: v2_artifact_quality
+    case_id: g00_review_markers_visible
+  - id: require_dependency_evidence_caveats
+    suite: v2_artifact_quality
+    case_id: g00_dependency_evidence_requires_caveats
+  - id: block_auto_apply_table_design_language
+    suite: v2_artifact_quality
+    case_id: g00_table_design_preview_no_apply_language
+  - id: block_executable_operation_language
+    suite: v2_runner_policy
+    case_id: g00_no_executable_operation_language
+  - id: keep_runtime_from_development_reference_docs
+    suite: v2_cross_realm_boundary
+    case_id: g00_runtime_does_not_inherit_development_or_legacy_reference_docs
+  - id: block_row_data_and_sp_execution_tools
+    suite: v2_mssql_mcp_readonly
+    case_id: g00_no_row_data_or_sp_execution_tools
+  - id: block_apply_and_deploy_requests
+    suite: v2_blocked_request_paths
+    case_id: g00_apply_or_deploy_requests_blocked
