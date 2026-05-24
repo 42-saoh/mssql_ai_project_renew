@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /workspace
 COPY requirements-dev.txt pyproject.toml ./
 RUN pip install --no-cache-dir -r requirements-dev.txt

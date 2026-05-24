@@ -24,7 +24,7 @@ The two realms must never share docs, config, skills, workspaces, credentials, o
 ## Start development
 
 ```bash
-python -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 pip install -e packages/contracts -e packages/orchestration -e packages/validation
 pip install -r requirements-dev.txt
