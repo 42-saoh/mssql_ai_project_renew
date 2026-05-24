@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "artifactType",
+    "title",
+    "contentMarkdown",
+    "evidenceRefs",
+    "reviewMarkers"
+  ],
+  "properties": {
+    "artifactType": {
+      "enum": [
+        "SP_ANALYSIS_DOC",
+        "DEPENDENCY_REPORT",
+        "DTO_DRAFT",
+        "SERVICE_DRAFT",
+        "MAPPER_INTERFACE",
+        "MAPPER_XML"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "contentMarkdown": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reviewMarkers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}

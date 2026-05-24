@@ -1,0 +1,65 @@
+openapi: 3.1.0
+info:
+  title: PLF DB Agent V2 API
+  version: 0.1.0
+paths:
+  /api/v1/chat-runs:
+    post:
+      summary: Create chat run
+      responses:
+        '200': { description: Chat run accepted }
+  /api/v1/chat-runs/{chatRunId}:
+    get:
+      summary: Get chat run
+      responses:
+        '200': { description: Chat run }
+  /api/v1/chat-runs/{chatRunId}/resume:
+    post:
+      summary: Resume interrupted chat run
+      responses:
+        '200': { description: Resumed }
+  /api/v1/conversations/{conversationId}:
+    get:
+      summary: Get conversation
+      responses:
+        '200': { description: Conversation }
+  /api/v1/artifacts:
+    get:
+      summary: List artifacts
+      responses:
+        '200': { description: Artifact list }
+  /api/v1/artifacts/{artifactId}:
+    get:
+      summary: Get artifact
+      responses:
+        '200': { description: Artifact }
+  /api/v1/metadata/search:
+    get:
+      summary: Search read-only metadata
+      responses:
+        '200': { description: Metadata results }
+  /api/v1/metadata/ready:
+    get:
+      summary: Check external MSSQL MCP readiness
+      responses:
+        '200': { description: External metadata gateway readiness }
+  /api/v1/metadata/tools:
+    get:
+      summary: List runtime-discovered external MSSQL MCP tools
+      responses:
+        '200': { description: External metadata tool catalog }
+  /api/v1/metadata/tools/{toolName}/invoke:
+    post:
+      summary: Invoke an external read-only MSSQL MCP tool
+      responses:
+        '200': { description: Tool invocation response or safe platform error }
+  /api/v1/metadata/db-profiles:
+    get:
+      summary: List external MSSQL MCP database profiles
+      responses:
+        '200': { description: External database profile registry }
+  /api/v1/approvals/{approvalId}/resume:
+    post:
+      summary: Resume approval flow
+      responses:
+        '200': { description: Approval resumed }

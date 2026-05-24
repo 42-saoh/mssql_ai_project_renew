@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ServiceCodexRunResult",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runType",
+    "targetKey",
+    "status",
+    "productionReady",
+    "reviewRequired",
+    "artifactProposals",
+    "blockers",
+    "validation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "ServiceCodexRunResult.v1"
+    },
+    "runType": {
+      "enum": [
+        "SP_ANALYSIS",
+        "DEPENDENCY_ANALYSIS",
+        "TABLE_DESIGN",
+        "DRAFT_GENERATION"
+      ]
+    },
+    "targetKey": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "SUCCEEDED",
+        "FAILED",
+        "BLOCKED",
+        "REVIEW_REQUIRED"
+      ]
+    },
+    "productionReady": {
+      "const": false
+    },
+    "reviewRequired": {
+      "type": "boolean"
+    },
+    "artifactProposals": {
+      "type": "array"
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validation": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

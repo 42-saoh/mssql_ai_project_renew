@@ -1,0 +1,4 @@
+name: v2_storage_redaction
+summary: Storage must not persist raw prompt, provider response, SP definitions, row data, or secrets.
+status: scaffold
+cases: []

@@ -1,0 +1,4 @@
+name: v2_cross_realm_boundary
+summary: Development and service runtime Codex realms must remain separate.
+status: scaffold
+cases: []

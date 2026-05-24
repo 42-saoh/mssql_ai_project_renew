@@ -1,0 +1,4 @@
+name: v2_intent_routing
+summary: Supported DB analysis intents route to the correct execution path.
+status: scaffold
+cases: []

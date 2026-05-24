@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ServiceCodexRunRequest",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "runType",
+    "chatRunId",
+    "conversationId",
+    "target",
+    "policy",
+    "toolMode",
+    "skillAllowlist",
+    "outputSchema"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "ServiceCodexRunRequest.v1"
+    },
+    "runType": {
+      "enum": [
+        "SP_ANALYSIS",
+        "DEPENDENCY_ANALYSIS",
+        "TABLE_DESIGN",
+        "DRAFT_GENERATION"
+      ]
+    },
+    "chatRunId": {
+      "type": "string"
+    },
+    "conversationId": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "dbProfileId",
+        "objectType",
+        "schema",
+        "name",
+        "targetKey"
+      ],
+      "properties": {
+        "dbProfileId": {
+          "type": "string"
+        },
+        "objectType": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "targetKey": {
+          "type": "string"
+        }
+      }
+    },
+    "policy": {
+      "type": "object"
+    },
+    "toolMode": {
+      "enum": [
+        "EVIDENCE_BUNDLE_ONLY",
+        "SCOPED_TOOL_PROXY"
+      ]
+    },
+    "skillAllowlist": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^runtime-"
+      }
+    },
+    "outputSchema": {
+      "type": "string"
+    },
+    "evidenceBundleRef": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

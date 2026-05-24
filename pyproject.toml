@@ -1,0 +1,14 @@
+[project]
+name = "plf-db-agent-v2-workspace"
+version = "0.1.0"
+description = "Greenfield PLF DB Agent V2 workspace"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [
+  "packages/contracts/src",
+  "packages/orchestration/src",
+  "packages/validation/src",
+  "services/codex-runner"
+]

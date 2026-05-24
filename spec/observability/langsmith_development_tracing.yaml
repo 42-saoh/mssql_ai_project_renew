@@ -1,0 +1,46 @@
+version: 0.1.0
+service: langsmithDevelopmentTracing
+scope: development-only
+defaultEnabled: false
+
+activation:
+  allRequired:
+    PLF_ENVIRONMENT: dev
+    PLF_LANGSMITH_ENABLED: "true"
+    LANGSMITH_TRACING: "true"
+    LANGSMITH_API_KEY: present
+
+environment:
+  requiredWhenEnabled:
+    - LANGSMITH_API_KEY
+  optional:
+    LANGSMITH_PROJECT: plf-db-agent-v2-dev
+    LANGSMITH_ENDPOINT: https://api.smith.langchain.com
+  localFlags:
+    PLF_ENVIRONMENT: dev
+    PLF_LANGSMITH_ENABLED: "false"
+    LANGSMITH_TRACING: "false"
+
+allowedTraceMetadata:
+  - environment
+  - intent
+  - policyDecision
+  - route
+  - pgptUsed
+  - pgptModel
+  - pgptFallbackReason
+
+forbiddenTraceData:
+  - raw prompt
+  - raw provider response
+  - raw stored procedure definition
+  - row data
+  - secrets
+  - api keys
+  - connection strings
+
+behavior:
+  productionAlwaysDisabled: true
+  testAlwaysDisabledUnlessInjected: true
+  disabledBehavior: no-op context manager
+  enabledBehavior: langsmith.tracing_context with sanitized tags and metadata only

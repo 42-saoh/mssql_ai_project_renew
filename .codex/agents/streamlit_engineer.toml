@@ -1,0 +1,6 @@
+name = "streamlit_engineer"
+description = "Builds Streamlit UI through FastAPI only."
+profile = "dev-edit"
+
+[instructions]
+summary = "Operate only in the Development Codex Realm. Do not execute service runtime jobs unless the goal explicitly requires testing the runner boundary."

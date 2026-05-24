@@ -1,0 +1,24 @@
+services:
+  api:
+    build: .
+    command: uvicorn apps.api.api_app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      PLF_METADATA_GATEWAY_URL: http://host.docker.internal:8100
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+  streamlit:
+    build: .
+    command: streamlit run apps/streamlit/app.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      PLF_API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - api
+  codex-runner:
+    build: .
+    command: uvicorn runner_app.main:app --app-dir services/codex-runner --host 0.0.0.0 --port 8010
+    ports:
+      - "8010:8010"

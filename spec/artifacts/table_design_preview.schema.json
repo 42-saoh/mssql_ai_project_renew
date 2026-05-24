@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "previewType",
+    "createTableScriptPreview",
+    "reviewRequired",
+    "blockedFromAutoApply"
+  ],
+  "properties": {
+    "previewType": {
+      "const": "TABLE_DESIGN_PREVIEW"
+    },
+    "createTableScriptPreview": {
+      "type": "string"
+    },
+    "reviewRequired": {
+      "const": true
+    },
+    "blockedFromAutoApply": {
+      "const": true
+    }
+  }
+}

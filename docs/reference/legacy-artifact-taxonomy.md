@@ -1,0 +1,16 @@
+# Legacy Artifact Taxonomy
+
+Allowed V2 public artifact types:
+
+- SP_ANALYSIS_DOC
+- DEPENDENCY_REPORT
+- DTO_DRAFT
+- SERVICE_DRAFT
+- MAPPER_INTERFACE
+- MAPPER_XML
+
+Retired:
+
+- DDL_DRAFT
+- VO_DRAFT
+- MODEL_DRAFT

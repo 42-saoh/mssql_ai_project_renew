@@ -1,0 +1,4 @@
+name: v2_runner_output_schema
+summary: Runner outputs must validate against JSON schema.
+status: scaffold
+cases: []

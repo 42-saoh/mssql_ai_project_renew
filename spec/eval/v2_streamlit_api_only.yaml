@@ -1,0 +1,4 @@
+name: v2_streamlit_api_only
+summary: Streamlit may call FastAPI only.
+status: scaffold
+cases: []

@@ -1,0 +1,4 @@
+name: v2_domain_guard
+summary: General non-DB requests must be blocked.
+status: scaffold
+cases: []

@@ -1,0 +1,4 @@
+name: v2_artifact_quality
+summary: Artifacts must contain evidence refs and visible review markers.
+status: scaffold
+cases: []

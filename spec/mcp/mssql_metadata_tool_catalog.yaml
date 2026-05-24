@@ -1,0 +1,91 @@
+version: 0.1.0
+service: externalMssqlMetadata
+implementationOwner: external-standalone-mssql-mcp
+baseUrlEnv: PLF_METADATA_GATEWAY_URL
+defaultLocalBaseUrl: http://localhost:8100
+readOnly: true
+runtimeDiscoveryOnly: true
+
+description: >
+  PLF DB Agent V2 does not implement or package the MSSQL MCP service.
+  The platform connects to an externally running standalone MSSQL metadata
+  MCP REST boundary and discovers its active tools at runtime.
+
+endpoints:
+  readiness:
+    method: GET
+    path: /health/ready
+  toolCatalog:
+    method: GET
+    path: /catalog/tools
+  dbProfiles:
+    method: GET
+    path: /config/db-profiles
+  invokeTool:
+    method: POST
+    pathTemplate: /tools/{toolName}/invoke
+    request:
+      type: object
+      required: [arguments]
+      properties:
+        arguments:
+          type: object
+
+metadataSearchMapping:
+  platformEndpoint: /api/v1/metadata/search
+  externalToolName: search_metadata_objects
+  argumentMapping:
+    q: query
+    dbProfileId: dbProfileId
+    limit: limit
+
+blockedBeforeProxy:
+  exactToolNames:
+    - execute_sql
+    - execute_procedure
+    - query_row_data
+    - apply_ddl
+    - apply_dml
+    - deploy_source
+  namePrefixes:
+    - execute_
+    - apply_
+    - deploy_
+  nameFragments:
+    - row_data
+    - free_sql
+    - ddl_apply
+    - dml_apply
+  argumentPolicy:
+    - no raw prompt
+    - no raw provider response
+    - no raw stored procedure definition
+    - no row data
+    - no secrets
+
+responseEnvelope:
+  success:
+    required: [ok, toolName]
+    properties:
+      ok: { type: boolean }
+      toolName: { type: string }
+      dbProfileId: { type: string }
+      snapshotId: { type: string }
+      collectedAt: { type: string }
+      evidenceRefs:
+        type: array
+        items: { type: object }
+      data: { type: object }
+  error:
+    required: [ok, error]
+    properties:
+      ok: { const: false }
+      error:
+        type: object
+        required: [code, message]
+        properties:
+          code: { type: string }
+          message: { type: string }
+          details:
+            type: object
+            description: Safe diagnostics only; never SQL text, connection strings, credentials, row data, or procedure execution output.

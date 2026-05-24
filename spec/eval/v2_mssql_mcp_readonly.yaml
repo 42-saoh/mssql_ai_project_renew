@@ -1,0 +1,4 @@
+name: v2_mssql_mcp_readonly
+summary: MSSQL MCP must expose only read-only metadata tools.
+status: scaffold
+cases: []

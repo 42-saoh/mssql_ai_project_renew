@@ -1,0 +1,4 @@
+name: v2_blocked_request_paths
+summary: Forbidden requests are blocked or approval-required without execution.
+status: scaffold
+cases: []
