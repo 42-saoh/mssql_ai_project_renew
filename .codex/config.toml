@@ -1,4 +1,4 @@
-approval_policy = "untrusted"
+approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 allow_login_shell = false
 web_search = "cached"
@@ -9,5 +9,5 @@ model_reasoning_summary = "auto"
 goals = true
 
 [agents]
-max_threads = 4
+max_threads = 6
 max_depth = 1
