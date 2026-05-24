@@ -35,3 +35,14 @@
 ## Dual Codex Realm
 
 Development Codex builds this repository. Service Codex Runner generates artifact proposals for service requests. They are separate trust realms.
+
+The boundary is contract-first:
+
+- Development Codex uses root docs, root `.codex`, root `.agents/skills`, and
+  Codex CLI `/goal`.
+- Service Codex Runner uses only files copied from
+  `services/codex-runner/runtime-template` into isolated runtime workspaces.
+- Docs, configs, agents, skills, workspaces, credentials, and audit boundaries
+  are not shared across realms.
+- The machine-readable contract is
+  `spec/development/dual_codex_realm_contract.yaml`.

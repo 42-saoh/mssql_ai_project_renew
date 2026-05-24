@@ -4,3 +4,13 @@ status: scaffold
 cases:
   - id: g00_runtime_does_not_inherit_development_or_legacy_reference_docs
     summary: Service Codex Runner runtime workspaces must not inherit root Development Codex docs, root skills, or legacy reference docs as runtime instructions.
+  - id: g01_dual_realm_docs_configs_agents_skills_are_distinct
+    summary: Root Development Codex and Service Codex Runner docs, configs, agents, and skills must be separately declared and non-overlapping.
+  - id: g01_runtime_workspace_uses_runtime_template_only
+    summary: Runtime workspaces must be copied from the runtime template only and must add only input, outputs, and scratch runtime directories.
+  - id: g01_runtime_config_blocks_approval_network_and_nested_agents
+    summary: Runtime Codex config must disable approvals and web search, default to read-only sandboxing, and prevent nested agent fanout.
+  - id: g01_runtime_does_not_contain_credentials_or_root_skill_refs
+    summary: Runtime template files must not contain credentials, root development skill imports, or root development config references.
+  - id: g01_development_and_runtime_skill_catalogs_match_filesystem
+    summary: Development and runtime skill catalog docs must match their respective filesystem skill directories.

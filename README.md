@@ -20,6 +20,7 @@ This repository is intentionally **not** a migration of the legacy project. The 
 | Service Codex Runner Realm | Generate service artifact proposals | `codex exec` inside isolated runtime workspaces |
 
 The two realms must never share docs, config, skills, workspaces, credentials, or audit boundaries.
+The enforceable boundary contract is `spec/development/dual_codex_realm_contract.yaml`.
 
 ## Start development
 

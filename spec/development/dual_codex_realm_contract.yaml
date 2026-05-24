@@ -1,0 +1,126 @@
+version: 0.1.0
+service: dualCodexRealm
+scope: development-and-service-runtime-boundary
+
+developmentRealm:
+  name: Development Codex Realm
+  root: "."
+  purpose: Build and maintain the PLF DB Agent V2 repository.
+  execution: Codex CLI /goal
+  docs:
+    - AGENTS.md
+    - POLICY.md
+    - PROJECT.md
+    - ARCHITECTURE.md
+    - EVAL_SPEC.md
+    - ROLES.md
+    - SKILLS.md
+    - TOOLS.md
+  config: .codex/config.toml
+  configExpectations:
+    approval_policy: on-request
+    sandbox_mode: workspace-write
+    allow_login_shell: false
+    features.goals: true
+    agents.max_depth: 1
+  agentsPath: .codex/agents
+  agents:
+    - architect
+    - platform_engineer
+    - streamlit_engineer
+    - langgraph_engineer
+    - codex_runner_engineer
+    - mcp_engineer
+    - reviewer
+  skillsPath: .agents/skills
+  skills:
+    - browser-automation-smoke
+    - context7-docs
+    - v2-codex-runner-design
+    - v2-contract-first-api
+    - v2-langgraph-orchestration
+    - v2-mssql-mcp-design
+    - v2-quality-gate-review
+    - v2-repo-bootstrap
+    - v2-streamlit-chat-ui
+
+serviceRuntimeRealm:
+  name: Service Codex Runner Realm
+  root: services/codex-runner/runtime-template
+  purpose: Generate bounded artifact proposals from sanitized service requests.
+  execution: codex exec inside isolated runtime workspaces
+  docs:
+    - AGENTS.md
+    - POLICY.md
+    - PROJECT.md
+    - ARCHITECTURE.md
+    - EVAL_SPEC.md
+    - ROLES.md
+    - SKILLS.md
+    - TOOLS.md
+  config: services/codex-runner/runtime-template/.codex/config.toml
+  configExpectations:
+    model: gpt-5.5
+    approval_policy: never
+    sandbox_mode: read-only
+    web_search: disabled
+    allow_login_shell: false
+    agents.max_threads: 1
+    agents.max_depth: 0
+  agentsPath: services/codex-runner/runtime-template/.codex/agents
+  agents:
+    - runtime_dependency_analyst
+    - runtime_java_mybatis_author
+    - runtime_reviewer
+    - runtime_sp_analyst
+    - runtime_table_designer
+  skillsPath: services/codex-runner/runtime-template/.agents/skills
+  skills:
+    - runtime-dependency-analysis
+    - runtime-java-mybatis-draft
+    - runtime-output-validation
+    - runtime-policy-review
+    - runtime-sp-analysis
+    - runtime-table-design-preview
+
+boundaryRules:
+  docsShared: false
+  configsShared: false
+  agentsShared: false
+  skillsShared: false
+  workspacesShared: false
+  credentialsShared: false
+  auditBoundariesShared: false
+  runtimeCanReadRootDevelopmentSkills: false
+  runtimeCanInheritRootDevelopmentDocs: false
+  developmentCanTreatRuntimeSkillsAsDevelopmentSkills: false
+  runtimeTemplateCanContainSecrets: false
+  runtimeOutputPersistenceAllowed: false
+  runtimeSourceModificationAllowed: false
+
+runtimeWorkspaceContract:
+  source: services/codex-runner/runtime-template
+  createdBy: services/codex-runner/runner_app/workspace.py
+  requiredRuntimeDirs:
+    - input
+    - outputs
+    - scratch
+  forbiddenCopiedFromRoot:
+    - .env
+    - .env.example
+    - DESIGN.md
+    - README.md
+    - goals
+    - docs/reference
+
+evalCases:
+  - id: g01_dual_realm_docs_configs_agents_skills_are_distinct
+    suite: v2_cross_realm_boundary
+  - id: g01_runtime_workspace_uses_runtime_template_only
+    suite: v2_cross_realm_boundary
+  - id: g01_runtime_config_blocks_approval_network_and_nested_agents
+    suite: v2_cross_realm_boundary
+  - id: g01_runtime_does_not_contain_credentials_or_root_skill_refs
+    suite: v2_cross_realm_boundary
+  - id: g01_development_and_runtime_skill_catalogs_match_filesystem
+    suite: v2_cross_realm_boundary

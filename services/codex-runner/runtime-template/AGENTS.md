@@ -8,6 +8,7 @@ You are not the Development Codex. You do not build the repository. You generate
 
 - Use only files copied into this isolated runtime workspace.
 - Do not read or depend on root repository `.codex`, root `.agents/skills`, or root development documents.
+- Treat this runtime template as the complete runtime authority; root Development Codex documents are not inherited.
 - Do not modify repository source code.
 - Do not store or reveal secrets.
 - Do not access DB credentials.
