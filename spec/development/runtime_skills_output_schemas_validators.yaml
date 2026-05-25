@@ -1,0 +1,108 @@
+version: 0.1.0
+service: runtimeSkillsOutputSchemasValidators
+scope: g08-runtime-skills-output-schemas-validators
+
+runtimeTemplate:
+  path: services/codex-runner/runtime-template
+  skillsPath: services/codex-runner/runtime-template/.agents/skills
+  schemaRoot: services/codex-runner/runtime-template/schemas
+  mustRemainServiceRealmOnly: true
+
+runtimeSkills:
+  runtime-sp-analysis:
+    path: services/codex-runner/runtime-template/.agents/skills/runtime-sp-analysis/SKILL.md
+    runType: SP_ANALYSIS
+    outputSchema: schemas/sp_analysis_result.schema.json
+    proposalArtifactTypes:
+      - SP_ANALYSIS_DOC
+  runtime-dependency-analysis:
+    path: services/codex-runner/runtime-template/.agents/skills/runtime-dependency-analysis/SKILL.md
+    runType: DEPENDENCY_ANALYSIS
+    outputSchema: schemas/dependency_analysis_result.schema.json
+    proposalArtifactTypes:
+      - DEPENDENCY_REPORT
+  runtime-table-design-preview:
+    path: services/codex-runner/runtime-template/.agents/skills/runtime-table-design-preview/SKILL.md
+    runType: TABLE_DESIGN
+    outputSchema: schemas/table_design_preview.schema.json
+    proposalArtifactTypes:
+      - TABLE_DESIGN_PREVIEW
+    previewOnly: true
+    blockedFromAutoApplyRequired: true
+  runtime-java-mybatis-draft:
+    path: services/codex-runner/runtime-template/.agents/skills/runtime-java-mybatis-draft/SKILL.md
+    runType: DRAFT_GENERATION
+    outputSchema: schemas/java_mybatis_draft_pack.schema.json
+    proposalArtifactTypes:
+      - DTO_DRAFT
+      - SERVICE_DRAFT
+      - MAPPER_INTERFACE
+      - MAPPER_XML
+  runtime-output-validation:
+    path: services/codex-runner/runtime-template/.agents/skills/runtime-output-validation/SKILL.md
+    validatorOnly: true
+    checks:
+      - requested runtime output schema
+      - productionReady false
+      - reviewRequired true
+      - evidence references
+      - review markers
+  runtime-policy-review:
+    path: services/codex-runner/runtime-template/.agents/skills/runtime-policy-review/SKILL.md
+    validatorOnly: true
+    checks:
+      - blocked operations
+      - redaction violations
+      - unsafe persistence candidates
+      - executable apply instructions
+
+outputSchemas:
+  generic:
+    - schemas/output.schema.json
+    - schemas/service_codex_run_result.schema.json
+  runSpecific:
+    SP_ANALYSIS: schemas/sp_analysis_result.schema.json
+    DEPENDENCY_ANALYSIS: schemas/dependency_analysis_result.schema.json
+    TABLE_DESIGN: schemas/table_design_preview.schema.json
+    DRAFT_GENERATION: schemas/java_mybatis_draft_pack.schema.json
+  requiredResultFields:
+    - schemaVersion
+    - runType
+    - targetKey
+    - status
+    - productionReady
+    - reviewRequired
+    - artifactProposals
+    - blockers
+    - validation
+
+validators:
+  runtimeValidator: services/codex-runner/runner_app/validator.py
+  sanitizer: services/codex-runner/runner_app/sanitizer.py
+  policyValidator: packages/validation/src/plf_agent_validation/policy_validator.py
+  redactionValidator: packages/validation/src/plf_agent_validation/redaction_validator.py
+  javaMybatisStaticValidator: packages/validation/src/plf_agent_validation/java_mybatis_validator.py
+  tablePreviewStaticValidator: packages/validation/src/plf_agent_validation/sql_preview_validator.py
+  invalidOutputBehavior: schema-valid BLOCKED result with no artifactProposals
+  requestedOutputSchemaMustBeValidatedAfterCodexExec: true
+
+policyBoundaries:
+  runnerReturnsProposalsOnly: true
+  artifactPersistenceAllowedInRunner: false
+  rowDataAllowed: false
+  procedureExecutionAllowed: false
+  ddlDmlApplyAllowed: false
+  sourceApplyAllowed: false
+  deployAllowed: false
+  rawPromptPersistenceAllowed: false
+  rawProviderResponsePersistenceAllowed: false
+  secretPersistenceAllowed: false
+  rootDevelopmentSkillsAllowedAtRuntime: false
+
+evalCases:
+  - id: g08_runtime_skills_declare_run_scope_schema_and_artifact_types
+    suite: v2_runtime_output_validation
+  - id: g08_requested_output_schema_mismatch_returns_blocked_result
+    suite: v2_runtime_output_validation
+  - id: g08_static_and_redaction_validators_block_unsafe_outputs
+    suite: v2_runtime_output_validation

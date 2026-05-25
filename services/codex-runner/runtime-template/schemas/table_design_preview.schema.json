@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ServiceCodexRunResult",
+  "title": "RuntimeTableDesignPreview",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -18,12 +18,7 @@
       "const": "ServiceCodexRunResult.v1"
     },
     "runType": {
-      "enum": [
-        "SP_ANALYSIS",
-        "DEPENDENCY_ANALYSIS",
-        "TABLE_DESIGN",
-        "DRAFT_GENERATION"
-      ]
+      "const": "TABLE_DESIGN"
     },
     "targetKey": {
       "type": "string"
@@ -51,25 +46,22 @@
           "title",
           "contentMarkdown",
           "evidenceRefs",
-          "reviewMarkers"
+          "reviewMarkers",
+          "previewType",
+          "createTableScriptPreview",
+          "reviewRequired",
+          "blockedFromAutoApply"
         ],
         "properties": {
           "artifactType": {
-            "enum": [
-              "SP_ANALYSIS_DOC",
-              "DEPENDENCY_REPORT",
-              "DTO_DRAFT",
-              "SERVICE_DRAFT",
-              "MAPPER_INTERFACE",
-              "MAPPER_XML",
-              "TABLE_DESIGN_PREVIEW"
-            ]
+            "const": "TABLE_DESIGN_PREVIEW"
           },
           "title": {
             "type": "string"
           },
           "contentMarkdown": {
-            "type": "string"
+            "type": "string",
+            "pattern": "REVIEW_REQUIRED"
           },
           "evidenceRefs": {
             "type": "array",
@@ -83,7 +75,23 @@
             "items": {
               "type": "string"
             },
-            "minItems": 1
+            "minItems": 1,
+            "contains": {
+              "const": "REVIEW_REQUIRED"
+            }
+          },
+          "previewType": {
+            "const": "TABLE_DESIGN_PREVIEW"
+          },
+          "createTableScriptPreview": {
+            "type": "string",
+            "pattern": "CREATE\\s+TABLE"
+          },
+          "reviewRequired": {
+            "const": true
+          },
+          "blockedFromAutoApply": {
+            "const": true
           }
         },
         "additionalProperties": true

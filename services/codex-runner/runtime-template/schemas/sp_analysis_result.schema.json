@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ServiceCodexRunResult",
+  "title": "RuntimeSpAnalysisResult",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -18,12 +18,7 @@
       "const": "ServiceCodexRunResult.v1"
     },
     "runType": {
-      "enum": [
-        "SP_ANALYSIS",
-        "DEPENDENCY_ANALYSIS",
-        "TABLE_DESIGN",
-        "DRAFT_GENERATION"
-      ]
+      "const": "SP_ANALYSIS"
     },
     "targetKey": {
       "type": "string"
@@ -55,21 +50,14 @@
         ],
         "properties": {
           "artifactType": {
-            "enum": [
-              "SP_ANALYSIS_DOC",
-              "DEPENDENCY_REPORT",
-              "DTO_DRAFT",
-              "SERVICE_DRAFT",
-              "MAPPER_INTERFACE",
-              "MAPPER_XML",
-              "TABLE_DESIGN_PREVIEW"
-            ]
+            "const": "SP_ANALYSIS_DOC"
           },
           "title": {
             "type": "string"
           },
           "contentMarkdown": {
-            "type": "string"
+            "type": "string",
+            "pattern": "REVIEW_REQUIRED"
           },
           "evidenceRefs": {
             "type": "array",
@@ -83,7 +71,10 @@
             "items": {
               "type": "string"
             },
-            "minItems": 1
+            "minItems": 1,
+            "contains": {
+              "const": "REVIEW_REQUIRED"
+            }
           }
         },
         "additionalProperties": true

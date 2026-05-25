@@ -12,6 +12,13 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 - `input/run_request.json`
 - `input/evidence_bundle.json`
 - `schemas/output.schema.json`
+- The requested run-specific schema under `schemas/`
+
+## Run Scope
+
+- Validator-only skill for every allowed runtime run type.
+- It must not create domain content by itself.
+- It checks the final JSON for schema-valid, policy-valid, and static-validation-passed flags.
 
 ## Procedure
 
@@ -24,8 +31,10 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 ## Output requirements
 
 - `productionReady` must be `false`.
-- `reviewRequired` must be `true` unless the schema explicitly says otherwise.
+- `reviewRequired` must be `true`.
 - Include evidence references for claims.
+- Include `REVIEW_REQUIRED` in `reviewMarkers` and generated markdown for every proposal.
+- Set `schemaValid`, `policyValid`, and `staticValidationPassed` to `false` when any blocker exists.
 - Do not include raw prompt, raw provider response, row data, secrets, or executable apply instructions.
 
 ## Forbidden

@@ -11,7 +11,13 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 
 - `input/run_request.json`
 - `input/evidence_bundle.json`
-- `schemas/output.schema.json`
+- `schemas/table_design_preview.schema.json`
+
+## Run Scope
+
+- Allowed `runType`: `TABLE_DESIGN`
+- Allowed proposal `artifactType`: `TABLE_DESIGN_PREVIEW`
+- Required output schema: `schemas/table_design_preview.schema.json`
 
 ## Procedure
 
@@ -24,8 +30,11 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 ## Output requirements
 
 - `productionReady` must be `false`.
-- `reviewRequired` must be `true` unless the schema explicitly says otherwise.
+- `reviewRequired` must be `true`.
 - Include evidence references for claims.
+- Include `REVIEW_REQUIRED` in `reviewMarkers` and generated markdown.
+- Include `previewType: TABLE_DESIGN_PREVIEW` and `blockedFromAutoApply: true`.
+- `createTableScriptPreview` is a manual-review preview only; it must not include DML, procedure execution, deployment, or auto-apply instructions.
 - Do not include raw prompt, raw provider response, row data, secrets, or executable apply instructions.
 
 ## Forbidden

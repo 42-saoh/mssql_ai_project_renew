@@ -11,7 +11,13 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 
 - `input/run_request.json`
 - `input/evidence_bundle.json`
-- `schemas/output.schema.json`
+- `schemas/dependency_analysis_result.schema.json`
+
+## Run Scope
+
+- Allowed `runType`: `DEPENDENCY_ANALYSIS`
+- Allowed proposal `artifactType`: `DEPENDENCY_REPORT`
+- Required output schema: `schemas/dependency_analysis_result.schema.json`
 
 ## Procedure
 
@@ -24,8 +30,9 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 ## Output requirements
 
 - `productionReady` must be `false`.
-- `reviewRequired` must be `true` unless the schema explicitly says otherwise.
+- `reviewRequired` must be `true`.
 - Include evidence references for claims.
+- Include `REVIEW_REQUIRED` in `reviewMarkers` and generated markdown.
 - Do not include raw prompt, raw provider response, row data, secrets, or executable apply instructions.
 
 ## Forbidden

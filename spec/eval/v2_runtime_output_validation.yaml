@@ -1,0 +1,14 @@
+version: 0.1.0
+suite: v2_runtime_output_validation
+scope: g08-runtime-skills-output-schemas-validators
+
+cases:
+  - id: g08_runtime_skills_declare_run_scope_schema_and_artifact_types
+    summary: Runtime skills must declare service-only scope, run type, output schema, and proposal artifact types.
+    expected: pass
+  - id: g08_requested_output_schema_mismatch_returns_blocked_result
+    summary: A result that passes the generic runner schema but violates the requested runtime schema must return a BLOCKED result with no proposals.
+    expected: pass
+  - id: g08_static_and_redaction_validators_block_unsafe_outputs
+    summary: Policy, static, and redaction validators must block unsafe previews, executable instructions, raw prompts, row data, secrets, and missing review markers.
+    expected: pass

@@ -92,7 +92,11 @@ def submit_real_run(
             sanitized["runtime"] = runtime
             return sanitized
 
-        validated, blockers = mark_validated(sanitized)
+        validated, blockers = mark_validated(
+            sanitized,
+            output_schema=output_schema,
+            schema_root=workspace / "schemas",
+        )
         if blockers:
             return safe_blocked_result(
                 request,

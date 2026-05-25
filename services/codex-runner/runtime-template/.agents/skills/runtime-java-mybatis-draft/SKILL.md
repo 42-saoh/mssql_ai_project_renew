@@ -11,7 +11,13 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 
 - `input/run_request.json`
 - `input/evidence_bundle.json`
-- `schemas/output.schema.json`
+- `schemas/java_mybatis_draft_pack.schema.json`
+
+## Run Scope
+
+- Allowed `runType`: `DRAFT_GENERATION`
+- Allowed proposal `artifactType`: `DTO_DRAFT`, `SERVICE_DRAFT`, `MAPPER_INTERFACE`, `MAPPER_XML`
+- Required output schema: `schemas/java_mybatis_draft_pack.schema.json`
 
 ## Procedure
 
@@ -24,8 +30,10 @@ This is a Service Codex Runner skill. It is not a Development Codex skill.
 ## Output requirements
 
 - `productionReady` must be `false`.
-- `reviewRequired` must be `true` unless the schema explicitly says otherwise.
+- `reviewRequired` must be `true`.
 - Include evidence references for claims.
+- Include `REVIEW_REQUIRED` in `reviewMarkers` and generated markdown.
+- Java/MyBatis file proposals remain draft text only and must not include apply, write, or deploy instructions.
 - Do not include raw prompt, raw provider response, row data, secrets, or executable apply instructions.
 
 ## Forbidden
