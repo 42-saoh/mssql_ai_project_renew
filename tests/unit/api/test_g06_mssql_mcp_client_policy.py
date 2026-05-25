@@ -139,6 +139,27 @@ def test_tool_success_response_must_match_requested_tool_name():
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"definition": "create procedure dbo.X as select 1"}}, "RAW_SP"),
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"procedureDefinition": "AS BEGIN SELECT 1 END"}}, "RAW_SP"),
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"definition": "AS BEGIN SELECT 1 END"}}, "RAW_SP"),
+        (
+            {
+                "ok": True,
+                "toolName": "get_procedure_definition",
+                "data": {"body": "AS BEGIN SET NOCOUNT ON; DECLARE @OrderId int; RETURN 0; END"},
+            },
+            "RAW_SP",
+        ),
+        (
+            {
+                "ok": True,
+                "toolName": "get_procedure_definition",
+                "data": {
+                    "script": (
+                        "SET ANSI_NULLS ON\nGO\nSET QUOTED_IDENTIFIER ON\nGO\n"
+                        "AS BEGIN SET NOCOUNT ON; RETURN 0; END"
+                    )
+                },
+            },
+            "RAW_SP",
+        ),
         ({"ok": True, "toolName": "get_procedure_definition", "data": {"definitionText": "AS BEGIN SELECT name FROM dbo.Customer END"}}, "RAW_SP"),
         ({"ok": True, "toolName": "get_procedure_definition", "data": {"routineBody": "BEGIN EXEC dbo.ProcessOrder END"}}, "RAW_SP"),
         ({"ok": True, "toolName": "get_procedure_definition", "data": {"moduleDefinition": "AS BEGIN UPDATE dbo.Customer SET Name = Name END"}}, "RAW_SP"),
@@ -212,6 +233,50 @@ def test_http_error_body_with_connection_string_is_sanitized_before_platform_res
         "path": "/tools/search_metadata_objects/invoke",
         "httpStatus": 503,
     }
+
+
+def test_external_error_response_with_connection_diagnostics_fails_closed():
+    def transport(method, path, payload):
+        return {
+            "ok": False,
+            "error": {
+                "code": "CONNECT_FAILED",
+                "message": "login failed for mssql+pyodbc://user:pwd@prod-sql/ERP",
+                "details": {"connectionString": "Data Source=prod-sql;Initial Catalog=ERP;"},
+            },
+        }
+
+    with pytest.raises(MssqlMcpClientError) as exc_info:
+        MssqlMcpClient(transport=transport).invoke_tool(
+            "search_metadata_objects",
+            {"dbProfileId": "master", "query": "order"},
+        )
+
+    assert exc_info.value.code == "MCP_RESPONSE_BLOCKED"
+    response = exc_info.value.to_response()
+    rendered = str(response).lower()
+    assert "mssql+pyodbc" not in rendered
+    assert "data source" not in rendered
+    assert "prod-sql" not in rendered
+    assert "CONNECTION_STRING" in response["error"]["details"]["violations"]
+
+
+def test_error_to_response_sanitizes_connection_string_diagnostics():
+    error = MssqlMcpClientError(
+        "MCP_UNAVAILABLE",
+        "login failed for Server=tcp:prod;Database=ERP;Integrated Security=True;",
+        details={"connectionString": "mssql+pyodbc://user:pwd@prod-sql/ERP"},
+    )
+
+    response = error.to_response()
+
+    rendered = str(response).lower()
+    assert response["error"]["code"] == "MCP_UNAVAILABLE"
+    assert response["error"]["message"] == "MSSQL MCP error diagnostics were blocked by platform redaction policy."
+    assert "server=" not in rendered
+    assert "mssql+pyodbc" not in rendered
+    assert "prod-sql" not in rendered
+    assert response["error"]["details"] == {"violations": ["CONNECTION_STRING"]}
 
 
 def test_http_error_body_with_jdbc_connection_diagnostic_is_sanitized_before_platform_response():

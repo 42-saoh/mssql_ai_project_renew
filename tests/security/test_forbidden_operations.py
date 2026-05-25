@@ -68,6 +68,8 @@ def test_redaction_detects_raw_payloads():
         '{"routineBody":"BEGIN EXEC dbo.ProcessOrder END"}',
         '{"moduleDefinition":"SET ANSI_NULLS ON GO AS BEGIN UPDATE dbo.Customer SET Name = Name END"}',
         '{"sourceText":"CREATE OR REPLACE PROCEDURE dbo.SyncOrder AS BEGIN SELECT 1 END"}',
+        '{"body":"AS BEGIN SET NOCOUNT ON; DECLARE @OrderId int; RETURN 0; END"}',
+        '{"script":"SET ANSI_NULLS ON GO SET QUOTED_IDENTIFIER ON GO AS BEGIN SET NOCOUNT ON; RETURN 0; END"}',
     ],
 )
 def test_redaction_detects_stored_procedure_definition_shapes(payload):
@@ -80,6 +82,7 @@ def test_redaction_detects_stored_procedure_definition_shapes(payload):
         "Data Source=prod-sql;Initial Catalog=ERP;Integrated Security=SSPI;",
         "jdbc:sqlserver://prod.database.windows.net:1433;databaseName=ERP;encrypt=true;",
         "Driver={ODBC Driver 18 for SQL Server};Server=tcp:prod;Database=ERP;Trusted_Connection=yes;",
+        "mssql+pyodbc://user:pwd@prod-sql/ERP?driver=ODBC+Driver+18+for+SQL+Server",
     ],
 )
 def test_redaction_detects_connection_string_shapes(payload):

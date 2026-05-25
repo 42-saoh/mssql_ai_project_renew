@@ -65,9 +65,15 @@ def test_g06_contract_preserves_metadata_gateway_policy_boundaries():
     assert response_policy["responseMayNotExposeRawStoredProcedureDefinitions"] is True
     assert response_policy["safeErrorsMayNotExposeConnectionStrings"] is True
     assert response_policy["safeErrorsMayNotExposeCredentials"] is True
+    assert "body_only_module_fragments" in response_policy["rawStoredProcedureDefinitionShapesBlocked"]
+    assert response_policy["safeDiagnosticsSanitizedAtSerialization"] is True
+    assert "sqlalchemy_mssql_urls" in response_policy["connectionStringShapesBlockedInDiagnostics"]
     assert catalog_response_policy["noRawStoredProcedureDefinitions"] is True
     assert catalog_response_policy["noConnectionStringsInSafeDiagnostics"] is True
     assert catalog_response_policy["noCredentialsInSafeDiagnostics"] is True
+    assert "body_only_module_fragments" in catalog_response_policy["rawStoredProcedureDefinitionShapesBlocked"]
+    assert catalog_response_policy["safeDiagnosticsSanitizedAtSerialization"] is True
+    assert "sqlalchemy_mssql_urls" in catalog_response_policy["connectionStringShapesBlockedInDiagnostics"]
 
 
 def test_g06_metadata_routes_are_declared_in_openapi():

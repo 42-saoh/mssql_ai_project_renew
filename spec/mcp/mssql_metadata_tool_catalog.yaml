@@ -122,8 +122,17 @@ responsePolicy:
   noSecrets: true
   noRawPromptOrProviderPayloads: true
   noRawStoredProcedureDefinitions: true
+  rawStoredProcedureDefinitionShapesBlocked:
+    - create_or_alter_procedure_scripts
+    - procedure_definition_body_script_fields
+    - body_only_module_fragments
   noConnectionStringsInSafeDiagnostics: true
   noCredentialsInSafeDiagnostics: true
+  safeDiagnosticsSanitizedAtSerialization: true
+  connectionStringShapesBlockedInDiagnostics:
+    - ado_net_key_value_strings
+    - jdbc_sqlserver_urls
+    - sqlalchemy_mssql_urls
 
 responseEnvelope:
   success:

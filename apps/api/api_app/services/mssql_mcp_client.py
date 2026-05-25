@@ -96,15 +96,24 @@ class MssqlMcpClientError(Exception):
     details: dict[str, Any] = field(default_factory=dict)
 
     def to_response(self) -> dict[str, Any]:
+        code = self.code
+        message = self.message
+        details = self.details
+        violations = _safe_payload_violations({"code": code, "message": message, "details": details})
+        if violations:
+            code = code if str(code).startswith("MCP_") else "MCP_ERROR"
+            message = "MSSQL MCP error diagnostics were blocked by platform redaction policy."
+            details = {"violations": sorted(set(violations))}
+
         payload: dict[str, Any] = {
             "ok": False,
             "error": {
-                "code": self.code,
-                "message": self.message,
+                "code": code,
+                "message": message,
             },
         }
-        if self.details:
-            payload["error"]["details"] = self.details
+        if details:
+            payload["error"]["details"] = details
         return payload
 
 

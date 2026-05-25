@@ -21,7 +21,8 @@ _RAW_SP_TEXT = re.compile(
 _SQL_DEFINITION_FIELD_NAME = (
     r"definition|definition[_ -]?text|sql[_ -]?definition|sql[_ -]?text|"
     r"object[_ -]?(?:definition|source)|module[_ -]?(?:definition|body|source)|"
-    r"routine[_ -]?(?:definition|body)|source[_ -]?text|body[_ -]?text"
+    r"routine[_ -]?(?:definition|body)|source[_ -]?text|body[_ -]?text|"
+    r"source|body|script|sql[_ -]?module|module[_ -]?sql|routine[_ -]?sql"
 )
 _RAW_SP_FIELD = re.compile(
     r'"?(?:stored[_ -]?procedure[_ -]?definition|procedure[_ -]?definition|'
@@ -34,6 +35,13 @@ _SQL_DEFINITION_FIELD = re.compile(
     r"\b(?:as|begin|select|insert|update|delete|merge|exec(?:ute)?)\b",
     re.I | re.S,
 )
+_RAW_SP_BODY_SHAPE = re.compile(
+    r"(?=.*\bend\b)"
+    r"(?=.*\b(?:set\s+nocount\s+on|declare\s+@\w+|return\b|raiserror\b|throw\b|begin\s+try)\b)"
+    r"(?:\bas\s+begin\b|\bbegin\s+try\b|\bset\s+nocount\s+on\b|"
+    r"\bset\s+(?:ansi_nulls|quoted_identifier)\s+on\b)",
+    re.I | re.S,
+)
 _CONNECTION_KEY = (
     r"driver|server|data\s+source|address|addr|network\s+address|initial\s+catalog|"
     r"database(?:\s*name)?|uid|user\s+id|trusted[_\s-]?connection|"
@@ -43,6 +51,7 @@ _CONNECTION_KEY = (
 _CONNECTION_STRING = re.compile(
     r'(?:"?connection[_ -]?string"?\s*[:=])|'
     r"jdbc:sqlserver://[^\s\"']{1,500}|sqlserver://[^\s\"']{1,500}|"
+    r"mssql(?:\+[A-Za-z0-9_]+)?://[^\s\"']{1,500}|"
     rf"\b(?:{_CONNECTION_KEY})\s*=\s*[^;\r\n\"']{{1,200}};\s*"
     rf"(?:(?:{_CONNECTION_KEY})\s*=\s*[^;\r\n\"']{{0,200}};?\s*){{1,}}",
     re.I,
@@ -62,7 +71,8 @@ _PATTERNS = {
         re.I,
     ),
     "RAW_SP": re.compile(
-        rf"(?:{_RAW_SP_TEXT.pattern})|(?:{_RAW_SP_FIELD.pattern})|(?:{_SQL_DEFINITION_FIELD.pattern})",
+        rf"(?:{_RAW_SP_TEXT.pattern})|(?:{_RAW_SP_FIELD.pattern})|"
+        rf"(?:{_SQL_DEFINITION_FIELD.pattern})|(?:{_RAW_SP_BODY_SHAPE.pattern})",
         re.I | re.S,
     ),
 }
