@@ -27,6 +27,14 @@ _VALUE_BEARING_BLOCKER_PREFIXES = {
     "UNKNOWN_ARTIFACT_TYPE",
 }
 _JAVA_FILE_NAME_BLOCKER_PREFIX = "JAVA_MYBATIS_STATIC:MISSING_REVIEW_MARKER:"
+_REDACTION_BLOCKER_CODES = {
+    "CONNECTION_STRING",
+    "RAW_PROMPT",
+    "RAW_PROVIDER_RESPONSE",
+    "RAW_SP",
+    "ROW_DATA",
+    "SECRET",
+}
 _RUN_TYPE_BY_ARTIFACT_TYPE = {
     "SP_ANALYSIS_DOC": "SP_ANALYSIS",
     "DEPENDENCY_REPORT": "DEPENDENCY_ANALYSIS",
@@ -75,7 +83,8 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
     ok, blockers = validate_runtime_result(result)
     blockers.extend(_persistence_blockers(proposal))
     if not ok or blockers:
-        safe_blockers = _safe_blocker_codes_for_validation(blockers)
+        response_blockers = _safe_response_blocker_codes_for_validation(blockers)
+        persisted_blockers = _safe_persisted_blocker_codes_for_validation(blockers)
         validation_id = f"validation_{uuid4().hex[:12]}"
         validation_record = {
             "validation_id": validation_id,
@@ -83,13 +92,13 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
             "schema_valid": False,
             "policy_valid": False,
             "static_valid": False,
-            "blocker_codes": safe_blockers,
+            "blocker_codes": persisted_blockers,
             "review_markers": [],
             "created_at": _now(),
         }
         assert_safe_to_persist(validation_record)
         validation = validation_repository.put(validation_id, validation_record)
-        return {"status": "BLOCKED", "blockers": safe_blockers, "validation": to_api_validation(validation)}
+        return {"status": "BLOCKED", "blockers": response_blockers, "validation": to_api_validation(validation)}
 
     artifact_id = f"artifact_{uuid4().hex[:12]}"
     content_markdown = str(proposal.get("contentMarkdown", ""))
@@ -149,20 +158,39 @@ def _runtime_result_for_proposal(proposal: dict, *, chat_run_id: str) -> dict:
     }
 
 
-def _safe_blocker_codes_for_validation(blockers: list[object]) -> list[str]:
+def _safe_response_blocker_codes_for_validation(blockers: list[object]) -> list[str]:
     safe_codes: list[str] = []
     for blocker in blockers:
-        code = _safe_blocker_code(blocker)
-        if code not in safe_codes:
-            safe_codes.append(code)
+        for code in _safe_response_blocker_codes(blocker):
+            if code not in safe_codes:
+                safe_codes.append(code)
     return safe_codes
 
 
-def _safe_blocker_code(blocker: object) -> str:
-    code = str(blocker)
-    if find_redaction_violations(code):
-        return "REDACTION_VIOLATION_BLOCKED"
+def _safe_persisted_blocker_codes_for_validation(blockers: list[object]) -> list[str]:
+    safe_codes: list[str] = []
+    for blocker in blockers:
+        code = str(blocker)
+        if code in _REDACTION_BLOCKER_CODES or find_redaction_violations(code):
+            safe_code = "REDACTION_VIOLATION_BLOCKED"
+        else:
+            safe_code = _safe_structural_blocker_code(code)
+        if safe_code not in safe_codes:
+            safe_codes.append(safe_code)
+    return safe_codes
 
+
+def _safe_response_blocker_codes(blocker: object) -> list[str]:
+    code = str(blocker)
+    if code in _REDACTION_BLOCKER_CODES:
+        return [code]
+    redaction_codes = find_redaction_violations(code)
+    if redaction_codes:
+        return redaction_codes
+    return [_safe_structural_blocker_code(code)]
+
+
+def _safe_structural_blocker_code(code: str) -> str:
     prefix, separator, suffix = code.partition(":")
     if separator and prefix in _VALUE_BEARING_BLOCKER_PREFIXES:
         if suffix in _SAFE_ARTIFACT_TYPE_LABELS:
@@ -241,7 +269,8 @@ def _validation_status(validation: dict) -> str:
 
 
 def _blocked_validation_response(blockers: list[str]) -> dict:
-    safe_blockers = _safe_blocker_codes_for_validation(blockers)
+    response_blockers = _safe_response_blocker_codes_for_validation(blockers)
+    persisted_blockers = _safe_persisted_blocker_codes_for_validation(blockers)
     validation_id = f"validation_{uuid4().hex[:12]}"
     validation_record = {
         "validation_id": validation_id,
@@ -249,13 +278,13 @@ def _blocked_validation_response(blockers: list[str]) -> dict:
         "schema_valid": False,
         "policy_valid": False,
         "static_valid": False,
-        "blocker_codes": safe_blockers,
+        "blocker_codes": persisted_blockers,
         "review_markers": [],
         "created_at": _now(),
     }
     assert_safe_to_persist(validation_record)
     validation = validation_repository.put(validation_id, validation_record)
-    return {"status": "BLOCKED", "blockers": safe_blockers, "validation": to_api_validation(validation)}
+    return {"status": "BLOCKED", "blockers": response_blockers, "validation": to_api_validation(validation)}
 
 
 def _now() -> str:
