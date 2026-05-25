@@ -11,9 +11,16 @@ CANONICAL_RUNTIME_TEMPLATE = Path(__file__).resolve().parents[1] / "runtime-temp
 RUNTIME_REQUIRED_PATHS = (
     "AGENTS.md",
     "POLICY.md",
+    "PROJECT.md",
+    "ARCHITECTURE.md",
+    "EVAL_SPEC.md",
+    "ROLES.md",
+    "SKILLS.md",
+    "TOOLS.md",
     ".codex/config.toml",
     ".agents/skills",
     "schemas/output.schema.json",
+    "schemas/service_codex_run_result.schema.json",
 )
 WORKSPACE_REQUIRED_DIRS = ("input", "outputs", "scratch")
 FORBIDDEN_COPIED_FROM_ROOT = (

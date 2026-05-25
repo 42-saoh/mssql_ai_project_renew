@@ -8,6 +8,7 @@ from plf_agent_validation.redaction_validator import find_redaction_violations
 
 ALLOWED_RUN_TYPES = {"SP_ANALYSIS", "DEPENDENCY_ANALYSIS", "TABLE_DESIGN", "DRAFT_GENERATION"}
 _BLOCKER_CODE = re.compile(r"[^A-Z0-9_]+")
+_SAFE_TARGET_KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
 _REDACTION_CODES = {
     "RAW_PROMPT",
     "RAW_PROVIDER_RESPONSE",
@@ -72,8 +73,7 @@ def safe_blocked_result(
     run_type = request.get("runType")
     if run_type not in ALLOWED_RUN_TYPES:
         run_type = "SP_ANALYSIS"
-    target = request.get("target") if isinstance(request.get("target"), dict) else {}
-    target_key = str(request.get("targetKey") or target.get("targetKey") or "unresolved")
+    target_key = _safe_target_key(request)
     result: dict[str, Any] = {
         "schemaVersion": "ServiceCodexRunResult.v1",
         "runType": run_type,
@@ -94,6 +94,19 @@ def safe_blocked_result(
     if runtime:
         result["runtime"] = runtime
     return result
+
+
+def _safe_target_key(request: dict[str, Any]) -> str:
+    target = request.get("target") if isinstance(request.get("target"), dict) else {}
+    for candidate in (request.get("targetKey"), target.get("targetKey")):
+        value = str(candidate or "").strip()
+        if _is_safe_target_key(value):
+            return value
+    return "unresolved"
+
+
+def _is_safe_target_key(value: str) -> bool:
+    return bool(value and _SAFE_TARGET_KEY.fullmatch(value) and not find_redaction_violations(value))
 
 
 def safe_blocker_codes(blockers: list[str]) -> list[str]:

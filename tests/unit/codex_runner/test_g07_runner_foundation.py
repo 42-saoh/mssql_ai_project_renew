@@ -98,6 +98,17 @@ def test_workspace_creation_copies_runtime_template_and_writes_inputs(tmp_path):
         cleanup_workspace(workspace)
 
 
+def test_workspace_contract_requires_all_g07_runtime_paths(tmp_path):
+    workspace = create_workspace(tmp_path, RUNTIME_TEMPLATE)
+    try:
+        (workspace / "PROJECT.md").unlink()
+
+        with pytest.raises(WorkspaceContractError, match="PROJECT.md"):
+            write_run_inputs(workspace, _request(), {"evidenceRefs": ["evidence.bundle.1"]})
+    finally:
+        cleanup_workspace(workspace)
+
+
 def test_event_parser_keeps_only_safe_summary_fields():
     stdout = "\n".join(
         [
@@ -176,6 +187,36 @@ def test_submit_real_run_blocks_unsafe_inputs_before_codex_exec(tmp_path):
     assert result["status"] == "BLOCKED"
     assert not result["artifactProposals"]
     assert "RUNNER_POLICY_ALLOWS_BLOCKED_OPERATION:ALLOW_DEPLOY" in result["blockers"]
+    assert called is False
+
+
+def test_submit_real_run_does_not_echo_unsafe_target_fields_when_blocked(tmp_path):
+    called = False
+    request = _request()
+    unsafe_target_key = "profile.PROCEDURE.dbo.InvoiceAudit raw prompt: password=abc"
+    request["targetKey"] = unsafe_target_key
+    request["target"]["targetKey"] = unsafe_target_key
+
+    def fake_codex(command, **kwargs):
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess(command, 0)
+
+    result = submit_real_run(
+        request,
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["targetKey"] == "unresolved"
+    assert result["artifactProposals"] == []
+    assert "RAW_PROMPT" in result["blockers"]
+    assert "SECRET" in result["blockers"]
+    assert unsafe_target_key not in serialized
+    assert "password=abc" not in serialized
     assert called is False
 
 

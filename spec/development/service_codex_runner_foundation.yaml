@@ -76,6 +76,7 @@ validation:
   validator: services/codex-runner/runner_app/validator.py
   sanitizer: services/codex-runner/runner_app/sanitizer.py
   blockedEnvelopeBlockersSanitized: true
+  blockedEnvelopeTargetKeySanitized: true
   outputSchema: spec/codex-runner/service_codex_run_result.schema.json
   invalidOutputBehavior: schema-valid BLOCKED result with no artifactProposals
   proposalStatusesAllowed:
