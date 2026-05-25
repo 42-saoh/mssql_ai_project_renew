@@ -44,6 +44,7 @@ def test_g08_runtime_output_validation_eval_cases_are_declared():
     assert "g08_runtime_skills_declare_run_scope_schema_and_artifact_types" in case_ids
     assert "g08_requested_output_schema_mismatch_returns_blocked_result" in case_ids
     assert "g08_static_and_redaction_validators_block_unsafe_outputs" in case_ids
+    assert "g08_executable_apply_deploy_procedure_instructions_are_blocked" in case_ids
 
 
 def test_g08_eval_runtime_schema_mismatch_is_a_schema_blocker():
@@ -61,6 +62,11 @@ def test_g08_eval_runtime_schema_mismatch_is_a_schema_blocker():
     [
         ("Generated proposal without visible marker.", "MISSING_REVIEW_MARKER_IN_CONTENT"),
         ("REVIEW_REQUIRED. Execute this SQL against production.", "EXECUTABLE_APPLY_INSTRUCTION"),
+        ("REVIEW_REQUIRED. Run this DDL against production.", "EXECUTABLE_APPLY_INSTRUCTION"),
+        ("REVIEW_REQUIRED. Apply the following migration.", "EXECUTABLE_APPLY_INSTRUCTION"),
+        ("REVIEW_REQUIRED. Overwrite source files with this mapper.", "EXECUTABLE_APPLY_INSTRUCTION"),
+        ("REVIEW_REQUIRED. Deploy this service.", "EXECUTABLE_APPLY_INSTRUCTION"),
+        ("REVIEW_REQUIRED. Call stored procedure dbo.ApplyInvoiceAudit.", "EXECUTABLE_APPLY_INSTRUCTION"),
         ("REVIEW_REQUIRED. raw provider response: secret model text", "RAW_PROVIDER_RESPONSE"),
         ("REVIEW_REQUIRED. sample data: customer alice", "ROW_DATA"),
     ],

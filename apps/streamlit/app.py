@@ -33,7 +33,7 @@ with overview_tab:
 with workflow_tab:
     st.markdown("#### Review flow")
     st.write("Submit a DB analysis request, review the route and blockers, inspect preview material, then validate before export.")
-    st.info("History, artifact detail, and diagnostics remain scaffolded for later G10/G11 backend wiring.")
+    st.info("History, artifact detail, validation records, and approval reviews are loaded through FastAPI.")
 
 with boundary_tab:
     st.markdown("#### Safety boundary")

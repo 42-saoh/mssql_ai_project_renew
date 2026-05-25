@@ -1,0 +1,15 @@
+name: v2_artifact_history_approval_ux
+suite: v2_artifact_history_approval_ux
+summary: Artifact, history, validation, and approval UX completion must remain sanitized, review-only, and FastAPI-bound.
+status: scaffold
+cases:
+  - id: g10_validated_artifact_persistence_records_validation_metadata
+    summary: Validated artifact proposals persist as draft-only metadata with content refs, hashes, review markers, and validation records.
+  - id: g10_invalid_or_preview_artifacts_block_before_persistence
+    summary: Invalid, unsafe, production-ready, retired, or preview-only proposals are blocked before artifact persistence with safe blocker codes.
+  - id: g10_history_returns_sanitized_summaries_only
+    summary: History APIs and UI return sanitized conversation and run summaries, never raw messages, prompts, provider responses, row data, SP definitions, or secrets.
+  - id: g10_approval_resume_has_no_execution_side_effects
+    summary: Approval resume updates review metadata only and never submits runners, persists artifacts, executes DB operations, applies source, or deploys.
+  - id: g10_streamlit_review_ux_uses_fastapi_client_only
+    summary: Streamlit history, artifact detail, validation, and approval UX use ApiClient methods only and avoid unsafe action labels.

@@ -54,6 +54,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatRunStatus"
+  /api/v1/conversations:
+    get:
+      summary: List sanitized conversations
+      responses:
+        "200":
+          description: Conversation list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationList"
   /api/v1/conversations/{conversationId}:
     get:
       summary: Get conversation
@@ -76,6 +86,22 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ArtifactList"
+  /api/v1/artifacts/validated:
+    post:
+      summary: Persist a validated artifact proposal as draft review metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersistValidatedArtifactRequest"
+      responses:
+        "200":
+          description: Artifact persistence result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersistValidatedArtifactResponse"
   /api/v1/artifacts/{artifactId}:
     get:
       summary: Get artifact
@@ -88,6 +114,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ArtifactDetail"
+  /api/v1/artifacts/{artifactId}/validations:
+    get:
+      summary: List artifact validation records
+      parameters:
+        - $ref: "#/components/parameters/ArtifactId"
+      responses:
+        "200":
+          description: Artifact validation list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactValidationList"
   /api/v1/metadata/search:
     get:
       summary: Search read-only metadata
@@ -170,6 +208,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DbProfileList"
+  /api/v1/approvals:
+    get:
+      summary: List approval review requests
+      responses:
+        "200":
+          description: Approval list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalList"
+  /api/v1/approvals/{approvalId}:
+    get:
+      summary: Get approval review request
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approval detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Approval"
   /api/v1/approvals/{approvalId}/resume:
     post:
       summary: Resume approval flow
@@ -280,6 +344,28 @@ components:
           items:
             type: object
       additionalProperties: true
+    ConversationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [conversationId, runCount]
+            properties:
+              conversationId:
+                type: string
+              title:
+                type: [string, "null"]
+              runCount:
+                type: integer
+              createdAt:
+                type: [string, "null"]
+              updatedAt:
+                type: [string, "null"]
+            additionalProperties: true
+      additionalProperties: false
     ArtifactProposal:
       type: object
       required: [artifactId, artifactType, title, contentRef, contentHash, evidenceRefs, reviewMarkers, productionReady, reviewRequired]
@@ -346,7 +432,82 @@ components:
           items:
             $ref: "#/components/schemas/ArtifactProposal"
     ArtifactDetail:
-      $ref: "#/components/schemas/ArtifactProposal"
+      allOf:
+        - $ref: "#/components/schemas/ArtifactProposal"
+        - type: object
+          properties:
+            validationStatus:
+              enum: [PENDING, VALIDATED, BLOCKED, FAILED]
+            validation:
+              $ref: "#/components/schemas/ArtifactValidation"
+            validations:
+              type: array
+              items:
+                $ref: "#/components/schemas/ArtifactValidation"
+          additionalProperties: true
+    ArtifactValidation:
+      type: object
+      required: [validationId, artifactId, schemaValid, policyValid, staticValid, blockerCodes, reviewMarkers, createdAt]
+      properties:
+        validationId:
+          type: string
+        artifactId:
+          type: string
+        schemaValid:
+          type: boolean
+        policyValid:
+          type: boolean
+        staticValid:
+          type: boolean
+        blockerCodes:
+          type: array
+          items:
+            type: string
+        reviewMarkers:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+      additionalProperties: false
+    ArtifactValidationList:
+      type: object
+      required: [artifactId, items]
+      properties:
+        artifactId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactValidation"
+      additionalProperties: false
+    PersistValidatedArtifactRequest:
+      type: object
+      required: [proposal]
+      properties:
+        chatRunId:
+          type: string
+          default: manual
+        codexRunId:
+          type: [string, "null"]
+        proposal:
+          $ref: "#/components/schemas/RunnerArtifactProposal"
+      additionalProperties: false
+    PersistValidatedArtifactResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          enum: [PERSISTED, BLOCKED]
+        artifact:
+          $ref: "#/components/schemas/ArtifactDetail"
+        validation:
+          $ref: "#/components/schemas/ArtifactValidation"
+        blockers:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
     MetadataSearchResponse:
       type: object
       required: [ok, toolName, data]
@@ -427,6 +588,34 @@ components:
         status:
           type: string
       additionalProperties: true
+    Approval:
+      type: object
+      required: [approvalId, chatRunId, approvalType, status, reason, requestedAt]
+      properties:
+        approvalId:
+          type: string
+        chatRunId:
+          type: string
+        approvalType:
+          type: string
+        status:
+          enum: [PENDING, RESUMED, NOT_FOUND]
+        reason:
+          type: string
+        requestedAt:
+          type: string
+        resolvedAt:
+          type: [string, "null"]
+      additionalProperties: true
+    ApprovalList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Approval"
+      additionalProperties: false
     ServiceCodexRunRequest:
       type: object
       required: [schemaVersion, runType, chatRunId, conversationId, target, policy, toolMode, skillAllowlist, outputSchema]

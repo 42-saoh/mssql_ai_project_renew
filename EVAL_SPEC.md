@@ -18,6 +18,7 @@
 - `v2_runner_output_schema`
 - `v2_storage_redaction`
 - `v2_artifact_quality`
+- `v2_artifact_history_approval_ux`
 - `v2_mssql_mcp_readonly`
 - `v2_streamlit_api_only`
 - `v2_end_to_end_happy_paths`

@@ -154,6 +154,27 @@ def get_conversation(conversation_id: str) -> dict[str, object]:
     }
 
 
+def list_conversations() -> dict[str, object]:
+    runs = run_repository.list_chat_runs()
+    items = []
+    for conversation in conversation_repository.list_all():
+        conversation_id = conversation["conversation_id"]
+        items.append(
+            {
+                "conversationId": conversation_id,
+                "title": conversation.get("title"),
+                "createdAt": conversation.get("created_at"),
+                "updatedAt": conversation.get("updated_at"),
+                "runCount": sum(
+                    1
+                    for run in runs
+                    if run.get("conversation_id") == conversation_id
+                ),
+            }
+        )
+    return {"items": items}
+
+
 def _chat_run_to_api(record: dict) -> dict[str, object]:
     return {
         "chatRunId": record["chat_run_id"],

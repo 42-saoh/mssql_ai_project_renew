@@ -106,3 +106,5 @@ evalCases:
     suite: v2_runtime_output_validation
   - id: g08_static_and_redaction_validators_block_unsafe_outputs
     suite: v2_runtime_output_validation
+  - id: g08_executable_apply_deploy_procedure_instructions_are_blocked
+    suite: v2_runtime_output_validation

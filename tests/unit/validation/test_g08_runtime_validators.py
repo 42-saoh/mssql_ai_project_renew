@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+from apps.api.api_app.repositories import artifact_repository, validation_repository
+from apps.api.api_app.services import artifact_service
 from plf_agent_validation.policy_validator import validate_runtime_result
 from plf_agent_validation.redaction_validator import find_redaction_violations
 
@@ -92,6 +96,28 @@ def test_runtime_validator_blocks_executable_procedure_instruction():
     assert "EXECUTABLE_APPLY_INSTRUCTION" in blockers
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        "REVIEW_REQUIRED. Run this DDL against the business database.",
+        "REVIEW_REQUIRED. Apply the following migration after review.",
+        "REVIEW_REQUIRED. Execute this update statement.",
+        "REVIEW_REQUIRED. Overwrite source files with this mapper.",
+        "REVIEW_REQUIRED. Deploy this service to production.",
+        "REVIEW_REQUIRED. Call stored procedure dbo.ApplyInvoiceAudit.",
+        "REVIEW_REQUIRED. \ud504\ub85c\uc2dc\uc800\ub97c \uc2e4\ud589\ud558\uc138\uc694.",
+    ],
+)
+def test_runtime_validator_broadly_blocks_executable_artifact_instructions(content):
+    result = _base_result()
+    result["artifactProposals"][0]["contentMarkdown"] = content
+
+    ok, blockers = validate_runtime_result(result)
+
+    assert not ok
+    assert "EXECUTABLE_APPLY_INSTRUCTION" in blockers
+
+
 def test_redaction_validator_blocks_row_data_raw_payloads_and_secrets():
     text = '{"rows": [{"customer": "alice"}], "rawPrompt": "abc", "password": "secret"}'
 
@@ -100,3 +126,30 @@ def test_redaction_validator_blocks_row_data_raw_payloads_and_secrets():
     assert "ROW_DATA" in violations
     assert "RAW_PROMPT" in violations
     assert "SECRET" in violations
+
+
+def test_blocked_artifact_response_returns_sanitized_safe_blocker_codes():
+    artifact_repository.clear()
+    validation_repository.clear()
+
+    result = artifact_service.persist_validated_artifact_request(
+        {
+            "chatRunId": "chatrun_1",
+            "proposal": {
+                "artifactType": "UNSAFE<script>alert(1)</script>",
+                "title": "Unsafe",
+                "contentMarkdown": "Generated proposal. REVIEW_REQUIRED.",
+                "evidenceRefs": ["evidence.1"],
+                "reviewMarkers": ["REVIEW_REQUIRED"],
+                "productionReady": False,
+            },
+        }
+    )
+
+    rendered = str(result)
+    assert result["status"] == "BLOCKED"
+    assert result["blockers"] == result["validation"]["blockerCodes"]
+    assert "UNKNOWN_ARTIFACT_TYPE" in result["blockers"]
+    assert "NON_PERSISTABLE_ARTIFACT_TYPE" in result["blockers"]
+    assert "<script>" not in rendered
+    assert "alert(1)" not in rendered

@@ -10,19 +10,31 @@ openapi:
     - /api/v1/chat-runs
     - /api/v1/chat-runs/{chatRunId}
     - /api/v1/chat-runs/{chatRunId}/resume
+    - /api/v1/conversations
     - /api/v1/conversations/{conversationId}
     - /api/v1/artifacts
+    - /api/v1/artifacts/validated
     - /api/v1/artifacts/{artifactId}
+    - /api/v1/artifacts/{artifactId}/validations
     - /api/v1/metadata/search
     - /api/v1/metadata/ready
     - /api/v1/metadata/tools
     - /api/v1/metadata/tools/{toolName}/invoke
     - /api/v1/metadata/db-profiles
+    - /api/v1/approvals
+    - /api/v1/approvals/{approvalId}
     - /api/v1/approvals/{approvalId}/resume
   requiredSchemas:
     - ChatRunCreate
     - ChatRunResponse
+    - ConversationList
     - ArtifactProposal
+    - ArtifactValidation
+    - ArtifactValidationList
+    - PersistValidatedArtifactRequest
+    - PersistValidatedArtifactResponse
+    - Approval
+    - ApprovalList
     - MetadataSearchResponse
     - MetadataToolInvokeRequest
     - ServiceCodexRunRequest
@@ -32,14 +44,19 @@ openapi:
     - /api/v1/chat-runs
     - /api/v1/chat-runs/{chatRunId}
     - /api/v1/chat-runs/{chatRunId}/resume
+    - /api/v1/conversations
     - /api/v1/conversations/{conversationId}
     - /api/v1/artifacts
+    - /api/v1/artifacts/validated
     - /api/v1/artifacts/{artifactId}
+    - /api/v1/artifacts/{artifactId}/validations
     - /api/v1/metadata/search
     - /api/v1/metadata/ready
     - /api/v1/metadata/tools
     - /api/v1/metadata/tools/{toolName}/invoke
     - /api/v1/metadata/db-profiles
+    - /api/v1/approvals
+    - /api/v1/approvals/{approvalId}
     - /api/v1/approvals/{approvalId}/resume
 
 runnerSchemas:
@@ -167,6 +184,7 @@ evalBaseline:
     - v2_runner_output_schema
     - v2_storage_redaction
     - v2_artifact_quality
+    - v2_artifact_history_approval_ux
     - v2_mssql_mcp_readonly
     - v2_streamlit_api_only
     - v2_end_to_end_happy_paths
@@ -184,6 +202,8 @@ evalBaseline:
       - g02_storage_schema_omits_raw_payload_columns
     v2_artifact_quality:
       - g02_artifact_schema_requires_evidence_and_review_markers
+    v2_artifact_history_approval_ux:
+      - g10_validated_artifact_persistence_records_validation_metadata
     v2_mssql_mcp_readonly:
       - g02_metadata_tool_catalog_readonly_contract
     v2_streamlit_api_only:

@@ -1,0 +1,120 @@
+version: 0.1.0
+service: artifactHistoryApprovalUxCompletion
+scope: g10-artifact-history-approval-ux-completion
+
+objective: Complete artifact, history, validation, and approval APIs plus Streamlit UX through FastAPI only.
+
+apiCompletion:
+  openapiContract: spec/openapi/plf_db_agent_v2_openapi.yaml
+  routeModules:
+    conversations: apps/api/api_app/routes/conversations.py
+    artifacts: apps/api/api_app/routes/artifacts.py
+    approvals: apps/api/api_app/routes/approvals.py
+  serviceModules:
+    chat: apps/api/api_app/services/chat_service.py
+    artifact: apps/api/api_app/services/artifact_service.py
+    approval: apps/api/api_app/services/approval_service.py
+  endpoints:
+    listConversations: /api/v1/conversations
+    getConversation: /api/v1/conversations/{conversationId}
+    listArtifacts: /api/v1/artifacts
+    persistValidatedArtifact: /api/v1/artifacts/validated
+    getArtifact: /api/v1/artifacts/{artifactId}
+    listArtifactValidations: /api/v1/artifacts/{artifactId}/validations
+    listApprovals: /api/v1/approvals
+    getApproval: /api/v1/approvals/{approvalId}
+    resumeApproval: /api/v1/approvals/{approvalId}/resume
+
+validationGate:
+  artifactPersistenceRequiresValidation: true
+  persistedArtifactContentInlineAllowed: false
+  persistedArtifactProductionReadyAllowed: false
+  persistedArtifactsRequireReviewMarkers: true
+  tableDesignPreviewPersistenceAllowed: false
+  validationRecordsExposeSafeBlockerCodesOnly: true
+
+historyPolicy:
+  conversationListReturnsSanitizedMetadataOnly: true
+  conversationDetailReturnsSanitizedRunSummariesOnly: true
+  rawUserMessageReturned: false
+  rawPromptReturned: false
+  rawProviderResponseReturned: false
+  rowDataReturned: false
+  rawStoredProcedureDefinitionReturned: false
+  secretReturned: false
+
+approvalPolicy:
+  approvalsAreReviewMetadataOnly: true
+  resumeApprovalExecutesDbOrRunner: false
+  resumeApprovalPersistsArtifacts: false
+  unsafeApprovalLabelsAllowedInUi: false
+
+uiCompletion:
+  apiClientPath: apps/streamlit/client/api_client.py
+  pages:
+    history:
+      path: apps/streamlit/pages/02_History.py
+      apiClientMethods:
+        - list_conversations
+        - get_conversation
+        - list_artifacts
+        - list_approvals
+        - get_approval
+        - resume_approval
+      visibleStates:
+        - SANITIZED ONLY
+        - DRAFT
+        - VALIDATED
+        - BLOCKED
+        - FAILED
+        - PENDING
+        - RESUMED
+    artifactDetail:
+      path: apps/streamlit/pages/03_Artifact_Detail.py
+      apiClientMethods:
+        - list_artifacts
+        - get_artifact
+        - list_artifact_validations
+      visibleStates:
+        - DRAFT
+        - MANUAL REVIEW REQUIRED
+        - VALIDATED
+        - BLOCKED
+        - FAILED
+        - PENDING
+  forbiddenDirectCalls:
+    - DB
+    - MSSQL MCP
+    - Metadata Gateway
+    - Service Codex Runner
+  forbiddenUnsafeLabels:
+    - Execute SQL
+    - Apply DDL
+    - Deploy
+    - Run stored procedure
+    - Auto-fix database
+    - Overwrite source
+
+policyBoundaries:
+  streamlitCallsFastApiOnly: true
+  serviceRunnerReturnsProposalsOnly: true
+  validationGateControlsArtifactPersistence: true
+  rowDataAllowed: false
+  storedProcedureExecutionAllowed: false
+  freeSqlExecutionAllowed: false
+  ddlDmlApplyAllowed: false
+  sourceApplyAllowed: false
+  deployAllowed: false
+  rawPromptPersistenceAllowed: false
+  rawProviderResponsePersistenceAllowed: false
+  rawStoredProcedureDefinitionPersistenceAllowed: false
+  secretPersistenceAllowed: false
+  rootDevelopmentSkillsAllowedAtRuntime: false
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g10_artifact_history_approval_ux_completion.py
+    - tests/unit/api/test_g10_artifact_history_approval_services.py
+    - tests/integration/test_g10_artifact_history_approval_routes.py
+    - tests/security/test_g10_artifact_history_approval_policy.py
+    - tests/eval/test_g10_artifact_history_approval_ux_eval.py

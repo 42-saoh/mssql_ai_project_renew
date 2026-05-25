@@ -75,6 +75,24 @@ with validation_tab:
     if artifact and str(artifact.get("status") or "").upper() in {"NOT_FOUND", "OFFLINE", "FAILED"}:
         st.error("Artifact detail is unavailable.")
         st.json(artifact)
+    elif artifact and artifact.get("artifactId"):
+        validations = client.list_artifact_validations(str(artifact["artifactId"]))
+        items = validations.get("items") if isinstance(validations.get("items"), list) else []
+        validation_state = str(artifact.get("validationStatus") or "PENDING").upper()
+        st.warning("Generated artifacts must remain draft-only until manual review is complete.")
+        st.json(
+            {
+                "validationStatus": validation_state,
+                "reviewMarkers": artifact.get("reviewMarkers", []),
+                "evidenceRefs": artifact.get("evidenceRefs", []),
+                "contentHash": artifact.get("contentHash"),
+                "states": ["VALIDATED", "BLOCKED", "FAILED"],
+            }
+        )
+        if items:
+            st.dataframe(items, use_container_width=True)
+        else:
+            render_empty_state("No validations", "No validation records were returned for this artifact.")
     else:
         st.warning("Generated artifacts must remain draft-only until manual review is complete.")
         st.json(

@@ -63,18 +63,28 @@ def test_api_client_exposes_history_artifact_and_admin_eval_fastapi_methods():
     client = ApiClient(base_url="http://api:8000", requester=requester)
 
     client.get_chat_run("run 1")
+    client.list_conversations()
     client.get_conversation("conv 1")
     client.list_artifacts()
     client.get_artifact("artifact 1")
+    client.list_artifact_validations("artifact 1")
+    client.list_approvals()
+    client.get_approval("approval 1")
+    client.resume_approval("approval 1")
     client.get_health()
     client.metadata_ready()
     client.list_metadata_tools()
 
     assert [call[1] for call in requester.calls] == [
         "http://api:8000/api/v1/chat-runs/run%201",
+        "http://api:8000/api/v1/conversations",
         "http://api:8000/api/v1/conversations/conv%201",
         "http://api:8000/api/v1/artifacts",
         "http://api:8000/api/v1/artifacts/artifact%201",
+        "http://api:8000/api/v1/artifacts/artifact%201/validations",
+        "http://api:8000/api/v1/approvals",
+        "http://api:8000/api/v1/approvals/approval%201",
+        "http://api:8000/api/v1/approvals/approval%201/resume",
         "http://api:8000/health",
         "http://api:8000/api/v1/metadata/ready",
         "http://api:8000/api/v1/metadata/tools",

@@ -40,11 +40,26 @@ class ApiClient:
     def get_conversation(self, conversation_id: str) -> dict[str, Any]:
         return self._get(f"/api/v1/conversations/{_path_part(conversation_id)}")
 
+    def list_conversations(self) -> dict[str, Any]:
+        return self._get("/api/v1/conversations")
+
     def list_artifacts(self) -> dict[str, Any]:
         return self._get("/api/v1/artifacts")
 
     def get_artifact(self, artifact_id: str) -> dict[str, Any]:
         return self._get(f"/api/v1/artifacts/{_path_part(artifact_id)}")
+
+    def list_artifact_validations(self, artifact_id: str) -> dict[str, Any]:
+        return self._get(f"/api/v1/artifacts/{_path_part(artifact_id)}/validations")
+
+    def list_approvals(self) -> dict[str, Any]:
+        return self._get("/api/v1/approvals")
+
+    def get_approval(self, approval_id: str) -> dict[str, Any]:
+        return self._get(f"/api/v1/approvals/{_path_part(approval_id)}")
+
+    def resume_approval(self, approval_id: str) -> dict[str, Any]:
+        return self._post(f"/api/v1/approvals/{_path_part(approval_id)}/resume", {})
 
     def get_health(self) -> dict[str, Any]:
         return self._get("/health")

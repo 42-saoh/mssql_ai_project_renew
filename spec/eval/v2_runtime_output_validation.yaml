@@ -12,3 +12,13 @@ cases:
   - id: g08_static_and_redaction_validators_block_unsafe_outputs
     summary: Policy, static, and redaction validators must block unsafe previews, executable instructions, raw prompts, row data, secrets, and missing review markers.
     expected: pass
+  - id: g08_executable_apply_deploy_procedure_instructions_are_blocked
+    summary: Runtime output policy must block run/apply DDL or DML, migration apply, source overwrite/apply, deploy, and stored-procedure execution wording before proposals can be returned or persisted.
+    expected: pass
+    blockedExamples:
+      - Run this DDL against the business database.
+      - Apply the following migration.
+      - Execute this update statement.
+      - Overwrite source files with this mapper.
+      - Deploy this service.
+      - Call stored procedure dbo.ApplyInvoiceAudit.
