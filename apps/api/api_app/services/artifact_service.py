@@ -9,8 +9,18 @@ from apps.api.api_app.repositories import artifact_repository, validation_reposi
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist, content_ref_for_artifact
 from plf_agent_contracts.enums import ArtifactType
 from plf_agent_validation.policy_validator import validate_runtime_result
+from plf_agent_validation.redaction_validator import find_redaction_violations
 
 PERSISTABLE_ARTIFACT_TYPES = {artifact_type.value for artifact_type in ArtifactType}
+_RUN_TYPE_BY_ARTIFACT_TYPE = {
+    "SP_ANALYSIS_DOC": "SP_ANALYSIS",
+    "DEPENDENCY_REPORT": "DEPENDENCY_ANALYSIS",
+    "DTO_DRAFT": "DRAFT_GENERATION",
+    "SERVICE_DRAFT": "DRAFT_GENERATION",
+    "MAPPER_INTERFACE": "DRAFT_GENERATION",
+    "MAPPER_XML": "DRAFT_GENERATION",
+    "TABLE_DESIGN_PREVIEW": "TABLE_DESIGN",
+}
 
 
 def list_artifacts() -> dict:
@@ -25,27 +35,23 @@ def get_artifact(artifact_id: str) -> dict:
 
 
 def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "manual", codex_run_id: str | None = None) -> dict:
-    result = {
-        "productionReady": proposal.get("productionReady", False),
-        "artifactProposals": [proposal],
-    }
+    result = _runtime_result_for_proposal(proposal, chat_run_id=chat_run_id)
     ok, blockers = validate_runtime_result(result)
     blockers.extend(_persistence_blockers(proposal))
     if not ok or blockers:
         validation_id = f"validation_{uuid4().hex[:12]}"
-        validation = validation_repository.put(
-            validation_id,
-            {
-                "validation_id": validation_id,
-                "artifact_id": "",
-                "schema_valid": False,
-                "policy_valid": False,
-                "static_valid": False,
-                "blocker_codes": blockers,
-                "review_markers": proposal.get("reviewMarkers", []),
-                "created_at": _now(),
-            },
-        )
+        validation_record = {
+            "validation_id": validation_id,
+            "artifact_id": "",
+            "schema_valid": False,
+            "policy_valid": False,
+            "static_valid": False,
+            "blocker_codes": _safe_blocker_codes_for_validation(blockers),
+            "review_markers": [],
+            "created_at": _now(),
+        }
+        assert_safe_to_persist(validation_record)
+        validation = validation_repository.put(validation_id, validation_record)
         return {"status": "BLOCKED", "blockers": blockers, "validation": validation}
 
     artifact_id = f"artifact_{uuid4().hex[:12]}"
@@ -68,20 +74,49 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
     artifact = artifact_repository.put(artifact_id, record)
 
     validation_id = f"validation_{uuid4().hex[:12]}"
-    validation = validation_repository.put(
-        validation_id,
-        {
-            "validation_id": validation_id,
-            "artifact_id": artifact_id,
-            "schema_valid": True,
-            "policy_valid": True,
-            "static_valid": True,
-            "blocker_codes": [],
-            "review_markers": record["review_markers"],
-            "created_at": _now(),
-        },
-    )
+    validation_record = {
+        "validation_id": validation_id,
+        "artifact_id": artifact_id,
+        "schema_valid": True,
+        "policy_valid": True,
+        "static_valid": True,
+        "blocker_codes": [],
+        "review_markers": record["review_markers"],
+        "created_at": _now(),
+    }
+    assert_safe_to_persist(validation_record)
+    validation = validation_repository.put(validation_id, validation_record)
     return {"status": "PERSISTED", "artifact": to_api_artifact(artifact), "validation": validation}
+
+
+def _runtime_result_for_proposal(proposal: dict, *, chat_run_id: str) -> dict:
+    artifact_type = _artifact_type_value(proposal.get("artifactType"))
+    return {
+        "schemaVersion": "ServiceCodexRunResult.v1",
+        "runType": _RUN_TYPE_BY_ARTIFACT_TYPE.get(artifact_type, "DRAFT_GENERATION"),
+        "targetKey": chat_run_id,
+        "status": "REVIEW_REQUIRED",
+        "productionReady": proposal.get("productionReady", False),
+        "reviewRequired": True,
+        "artifactProposals": [proposal],
+        "blockers": [],
+        "validation": {
+            "schemaValid": True,
+            "policyValid": True,
+            "staticValidationPassed": True,
+        },
+    }
+
+
+def _safe_blocker_codes_for_validation(blockers: list[str]) -> list[str]:
+    safe_codes: list[str] = []
+    for blocker in blockers:
+        code = str(blocker)
+        if find_redaction_violations(code):
+            code = "REDACTION_VIOLATION_BLOCKED"
+        if code not in safe_codes:
+            safe_codes.append(code)
+    return safe_codes
 
 
 def _persistence_blockers(proposal: dict) -> list[str]:

@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from .redaction_validator import find_redaction_violations
+from .schema_validator import validate_artifact_proposal_schema, validate_runner_result_schema
 
 ALLOWED_ARTIFACT_TYPES = {
     "SP_ANALYSIS_DOC",
@@ -26,6 +27,7 @@ FORBIDDEN_OUTPUT_PHRASES = [
 
 def validate_runtime_result(result: dict[str, Any]) -> tuple[bool, list[str]]:
     blockers: list[str] = []
+    blockers.extend(validate_runner_result_schema(result))
 
     if result.get("productionReady") is not False:
         blockers.append("PRODUCTION_READY_TRUE_BLOCKED")
@@ -39,6 +41,7 @@ def validate_runtime_result(result: dict[str, Any]) -> tuple[bool, list[str]]:
             blockers.append("EXECUTABLE_APPLY_INSTRUCTION")
 
     for artifact in result.get("artifactProposals", []):
+        blockers.extend(validate_artifact_proposal_schema(artifact))
         artifact_type = artifact.get("artifactType")
         if artifact_type in RETIRED_ARTIFACT_TYPES:
             blockers.append(f"RETIRED_ARTIFACT_TYPE:{artifact_type}")
@@ -46,6 +49,8 @@ def validate_runtime_result(result: dict[str, Any]) -> tuple[bool, list[str]]:
             # Table design preview is allowed as preview, but not as a persisted artifact.
             if artifact_type != "TABLE_DESIGN_PREVIEW":
                 blockers.append(f"UNKNOWN_ARTIFACT_TYPE:{artifact_type}")
+        if not artifact.get("evidenceRefs"):
+            blockers.append("MISSING_EVIDENCE_REFS")
         if not artifact.get("reviewMarkers"):
             blockers.append("MISSING_REVIEW_MARKERS")
 
