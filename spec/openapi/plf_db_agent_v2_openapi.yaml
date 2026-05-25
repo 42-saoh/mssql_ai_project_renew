@@ -509,16 +509,43 @@ components:
             type: string
       additionalProperties: true
     MetadataSearchResponse:
+      oneOf:
+        - $ref: "#/components/schemas/MetadataSearchSuccessResponse"
+        - $ref: "#/components/schemas/MetadataSafeErrorResponse"
+      description: >
+        Read-only metadata search response. Blocked or unsafe metadata search
+        requests return the safe error envelope and do not require toolName or data.
+    MetadataSearchSuccessResponse:
       type: object
       required: [ok, toolName, data]
       properties:
         ok:
-          type: boolean
+          const: true
         toolName:
           const: search_metadata_objects
         data:
           type: object
       additionalProperties: true
+    MetadataSafeErrorResponse:
+      type: object
+      required: [ok, error]
+      additionalProperties: false
+      properties:
+        ok:
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              description: Safe diagnostics only; never SQL text, connection strings, credentials, row data, stored procedure execution output, raw prompts, or raw provider responses.
+              additionalProperties: true
     HistoryLookupResponse:
       type: object
       required: [source, items]
@@ -560,11 +587,15 @@ components:
         arguments:
           type: object
     MetadataToolInvokeResponse:
+      oneOf:
+        - $ref: "#/components/schemas/MetadataToolInvokeSuccessResponse"
+        - $ref: "#/components/schemas/MetadataSafeErrorResponse"
+    MetadataToolInvokeSuccessResponse:
       type: object
-      required: [ok]
+      required: [ok, toolName]
       properties:
         ok:
-          type: boolean
+          const: true
         toolName:
           type: string
         data:

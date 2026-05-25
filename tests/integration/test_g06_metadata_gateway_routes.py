@@ -32,7 +32,27 @@ def test_metadata_search_route_blocks_unsafe_query_before_proxy():
     body = response.json()
     assert body["ok"] is False
     assert body["error"]["code"] == "MCP_ARGUMENTS_BLOCKED"
+    assert "toolName" not in body
+    assert "data" not in body
     assert "drop table" not in str(body).lower()
+
+
+def test_metadata_search_route_blocks_free_sql_phrase_with_safe_error_envelope():
+    response = TestClient(create_app()).get(
+        "/api/v1/metadata/search",
+        params={"q": "run query for customer metadata"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    rendered = str(body).lower()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "MCP_ARGUMENTS_BLOCKED"
+    assert body["error"]["message"] == "MCP arguments contain content blocked by platform redaction policy."
+    assert "FREE_SQL_EXECUTION_BLOCKED" in body["error"]["details"]["violations"]
+    assert "toolName" not in body
+    assert "data" not in body
+    assert "run query" not in rendered
 
 
 @pytest.mark.parametrize(

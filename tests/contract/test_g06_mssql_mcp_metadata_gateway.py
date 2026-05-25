@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
 import yaml
 
 from apps.api.api_app.services.mssql_mcp_client import ALLOWED_METADATA_TOOL_NAMES
@@ -82,6 +83,40 @@ def test_g06_metadata_routes_are_declared_in_openapi():
 
     for path in spec["platformRoutes"].values():
         assert path in openapi["paths"]
+
+
+def test_g06_openapi_metadata_search_models_success_and_safe_error_envelopes():
+    spec = _spec()
+    openapi = _load_yaml(spec["externalBoundary"]["openapiContract"])
+    schemas = openapi["components"]["schemas"]
+
+    response_schema = schemas["MetadataSearchResponse"]
+    response_refs = {branch["$ref"] for branch in response_schema["oneOf"]}
+    assert response_refs == {
+        "#/components/schemas/MetadataSearchSuccessResponse",
+        "#/components/schemas/MetadataSafeErrorResponse",
+    }
+
+    success_schema = schemas["MetadataSearchSuccessResponse"]
+    safe_error_schema = schemas["MetadataSafeErrorResponse"]
+
+    assert success_schema["required"] == ["ok", "toolName", "data"]
+    assert success_schema["properties"]["ok"]["const"] is True
+    assert safe_error_schema["required"] == ["ok", "error"]
+    assert safe_error_schema["properties"]["ok"]["const"] is False
+    assert "toolName" not in safe_error_schema["required"]
+    assert "data" not in safe_error_schema["required"]
+
+    Draft202012Validator(safe_error_schema).validate(
+        {
+            "ok": False,
+            "error": {
+                "code": "MCP_ARGUMENTS_BLOCKED",
+                "message": "MCP arguments contain content blocked by platform redaction policy.",
+                "details": {"violations": ["FREE_SQL_EXECUTION_BLOCKED"]},
+            },
+        }
+    )
 
 
 def test_g06_eval_cases_are_declared():

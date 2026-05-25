@@ -37,6 +37,34 @@ def test_catalog_filters_to_explicit_readonly_allowlist():
     assert set(catalog["policy"]["allowedToolNames"]) == ALLOWED_METADATA_TOOL_NAMES
 
 
+def test_catalog_filters_blocked_tools_before_unsafe_response_validation():
+    def transport(method, path, payload):
+        return {
+            "tools": [
+                {"name": "search_metadata_objects", "readOnly": True},
+                {
+                    "name": "execute_sql",
+                    "readOnly": False,
+                    "description": "execute select * from dbo.Customer with password=abc",
+                },
+                {
+                    "name": "drop_table",
+                    "readOnly": False,
+                    "description": "drop table dbo.Customer",
+                },
+            ]
+        }
+
+    catalog = MssqlMcpClient(transport=transport).list_tools()
+
+    rendered = str(catalog).lower()
+    assert [tool["name"] for tool in catalog["tools"]] == ["search_metadata_objects"]
+    assert catalog["policy"]["filteredToolCount"] == 2
+    assert "select *" not in rendered
+    assert "password" not in rendered
+    assert "drop table" not in rendered
+
+
 @pytest.mark.parametrize(
     "tool_name",
     [
@@ -112,6 +140,34 @@ def test_unsafe_arguments_fail_before_transport(arguments, violation):
 
     with pytest.raises(MssqlMcpClientError) as exc_info:
         MssqlMcpClient(transport=transport).invoke_tool("search_metadata_objects", arguments)
+
+    assert exc_info.value.code == "MCP_ARGUMENTS_BLOCKED"
+    assert violation in exc_info.value.details["violations"]
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("query", "violation"),
+    [
+        ("run query for customer metadata", "FREE_SQL_EXECUTION_BLOCKED"),
+        ("free SQL execution for metadata lookup", "FREE_SQL_EXECUTION_BLOCKED"),
+        ("run this DDL for dbo.Customer", "DDL_DML_APPLY_BLOCKED"),
+        ("deploy source for the mapper", "SOURCE_APPLY_OR_DEPLOY_BLOCKED"),
+        ("show actual rows for dbo.Customer", "ROW_DATA_ACCESS_BLOCKED"),
+    ],
+)
+def test_forbidden_operation_argument_codes_block_allowed_tools_before_transport(query, violation):
+    calls = []
+
+    def transport(method, path, payload):
+        calls.append((method, path, payload))
+        return {"ok": True}
+
+    with pytest.raises(MssqlMcpClientError) as exc_info:
+        MssqlMcpClient(transport=transport).invoke_tool(
+            "search_metadata_objects",
+            {"dbProfileId": "master", "query": query},
+        )
 
     assert exc_info.value.code == "MCP_ARGUMENTS_BLOCKED"
     assert violation in exc_info.value.details["violations"]

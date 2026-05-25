@@ -84,7 +84,11 @@ _MCP_PAYLOAD_BLOCKED_PATTERNS = {
     "SOURCE_APPLY_OR_DEPLOY": re.compile(r"\b(?:deploy|apply\s+source|overwrite\s+source)\b", re.I),
 }
 _MCP_FORBIDDEN_OPERATION_CODES = {
+    "ROW_DATA_ACCESS_BLOCKED",
     "STORED_PROCEDURE_EXECUTION_BLOCKED",
+    "FREE_SQL_EXECUTION_BLOCKED",
+    "DDL_DML_APPLY_BLOCKED",
+    "SOURCE_APPLY_OR_DEPLOY_BLOCKED",
 }
 _MIN_METADATA_LIMIT = 1
 _MAX_METADATA_LIMIT = 100
@@ -174,7 +178,8 @@ class MssqlMcpClient:
         return self._request_json("GET", "/health/ready")
 
     def list_tools(self) -> dict[str, Any]:
-        return _filter_tool_catalog(self._request_json("GET", "/catalog/tools"))
+        catalog = self._request_json("GET", "/catalog/tools", validate_response=False)
+        return self._validate_response_payload("/catalog/tools", _filter_tool_catalog(catalog))
 
     def list_db_profiles(self) -> dict[str, Any]:
         return self._request_json("GET", "/config/db-profiles")
@@ -254,9 +259,14 @@ class MssqlMcpClient:
         method: str,
         path: str,
         payload: dict[str, Any] | None = None,
+        *,
+        validate_response: bool = True,
     ) -> dict[str, Any]:
         if self.transport is not None:
-            return self._validate_response_payload(path, self.transport(method, path, payload))
+            parsed = self._validate_json_object(path, self.transport(method, path, payload))
+            if validate_response:
+                return self._validate_response_payload(path, parsed)
+            return parsed
 
         data = None
         headers = {"Accept": "application/json"}
@@ -296,7 +306,10 @@ class MssqlMcpClient:
                 "External MSSQL MCP returned invalid JSON.",
                 details={"path": path, "errorClass": exc.__class__.__name__},
             ) from exc
-        return self._validate_response_payload(path, parsed)
+        parsed = self._validate_json_object(path, parsed)
+        if validate_response:
+            return self._validate_response_payload(path, parsed)
+        return parsed
 
     def _http_error(self, path: str, exc: urllib.error.HTTPError) -> MssqlMcpClientError:
         try:
@@ -323,13 +336,17 @@ class MssqlMcpClient:
     def _url(self, path: str) -> str:
         return f"{self.base_url.rstrip('/')}/{path.lstrip('/')}"
 
-    def _validate_response_payload(self, path: str, parsed: Any) -> dict[str, Any]:
+    def _validate_json_object(self, path: str, parsed: Any) -> dict[str, Any]:
         if not isinstance(parsed, dict):
             raise MssqlMcpClientError(
                 "MCP_INVALID_RESPONSE",
                 "External MSSQL MCP response must be a JSON object.",
                 details={"path": path},
             )
+        return parsed
+
+    def _validate_response_payload(self, path: str, parsed: Any) -> dict[str, Any]:
+        parsed = self._validate_json_object(path, parsed)
         violations = _safe_payload_violations(parsed)
         if violations:
             raise MssqlMcpClientError(
