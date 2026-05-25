@@ -139,6 +139,15 @@ def _safe_payload_violations(payload: Any) -> list[str]:
     return violations
 
 
+def _safe_tool_name_for_diagnostics(tool_name: str) -> str:
+    stripped = (tool_name or "").strip()
+    if _safe_payload_violations({"toolName": stripped}):
+        return "<redacted>"
+    if _TOOL_NAME_PATTERN.fullmatch(stripped) is None:
+        return "<invalid>"
+    return normalize_tool_name(stripped)
+
+
 @dataclass(frozen=True)
 class MssqlMcpClient:
     base_url: str = DEFAULT_METADATA_GATEWAY_URL
@@ -186,7 +195,10 @@ class MssqlMcpClient:
                 "MCP_TOOL_BLOCKED",
                 "Requested MCP tool is blocked by platform read-only policy.",
                 status_code=403,
-                details={"toolName": tool_name, "readOnlyMetadataTool": False},
+                details={
+                    "toolName": _safe_tool_name_for_diagnostics(tool_name),
+                    "readOnlyMetadataTool": False,
+                },
             )
         violations = _safe_payload_violations(arguments)
         if violations:

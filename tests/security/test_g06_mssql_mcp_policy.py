@@ -76,6 +76,25 @@ def test_safe_error_from_blocked_tool_omits_raw_arguments():
     assert "abc" not in rendered
 
 
+def test_safe_error_from_blocked_tool_name_omits_unsafe_tool_text():
+    try:
+        MssqlMcpClient(transport=lambda method, path, payload: {"ok": True}).invoke_tool(
+            "execute_sql password=abc select * from dbo.Customer",
+            {"dbProfileId": "master"},
+        )
+    except MssqlMcpClientError as exc:
+        response = exc.to_response()
+    else:  # pragma: no cover
+        raise AssertionError("blocked tool should raise")
+
+    rendered = str(response).lower()
+    assert response["error"]["code"] == "MCP_TOOL_BLOCKED"
+    assert response["error"]["details"]["toolName"] == "<redacted>"
+    assert "select *" not in rendered
+    assert "password" not in rendered
+    assert "abc" not in rendered
+
+
 def test_unsafe_external_response_is_not_returned_to_platform():
     def transport(method, path, payload):
         return {
