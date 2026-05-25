@@ -64,6 +64,7 @@ def test_validation_env_adds_explicit_python_make_and_path(tmp_path, monkeypatch
         validation_path_prepend=[str(extra_dir)],
         validation_python=str(python_bin),
         validation_make=str(make_bin),
+        no_validation_tool_autodiscover=False,
     )
     monkeypatch.setenv("PATH", "C:\\Windows")
 
@@ -72,6 +73,51 @@ def test_validation_env_adds_explicit_python_make_and_path(tmp_path, monkeypatch
 
     assert env["PYTHON"] == str(python_bin)
     assert path_parts[:3] == [str(extra_dir), str(python_bin.parent), str(make_bin.parent)]
+
+
+def test_validation_env_autodiscovers_windows_python_and_make(monkeypatch):
+    args = SimpleNamespace(
+        validation_path_prepend=[],
+        validation_python=None,
+        validation_make=None,
+        no_validation_tool_autodiscover=False,
+    )
+    monkeypatch.setattr(runner, "is_windows", lambda: True)
+    monkeypatch.setenv("PATH", "C:\\Windows")
+
+    def fake_run_command(cmd, cwd, log_path=None, input_text=None, env=None):
+        assert "$pythonCommand = Get-Command python" in cmd[-1]
+        assert "$makeCommand = Get-Command make" in cmd[-1]
+        return 0, '{"python":"C:\\\\Python314\\\\python.exe","make":"C:\\\\Tools\\\\make\\\\bin\\\\make.exe"}', ""
+
+    monkeypatch.setattr(runner, "run_command", fake_run_command)
+
+    env = runner.build_validation_env(args)
+    path_parts = env["PATH"].split(runner.os.pathsep)
+
+    assert env["PYTHON"] == "C:\\Python314\\python.exe"
+    assert path_parts[:2] == ["C:\\Python314", "C:\\Tools\\make\\bin"]
+
+
+def test_validation_env_autodiscovery_keeps_partial_tool_result(monkeypatch):
+    args = SimpleNamespace(
+        validation_path_prepend=[],
+        validation_python=None,
+        validation_make=None,
+        no_validation_tool_autodiscover=False,
+    )
+    monkeypatch.setattr(runner, "is_windows", lambda: True)
+    monkeypatch.setenv("PATH", "C:\\Windows")
+    monkeypatch.setattr(
+        runner,
+        "run_command",
+        lambda *args, **kwargs: (0, '{"python":null,"make":"C:\\\\Tools\\\\make\\\\bin\\\\make.exe"}', ""),
+    )
+
+    env = runner.build_validation_env(args)
+
+    assert "PYTHON" not in env
+    assert env["PATH"].split(runner.os.pathsep)[0] == "C:\\Tools\\make\\bin"
 
 
 def test_stage_boundaries_match_goal_plan(tmp_path):
@@ -115,6 +161,7 @@ def test_stage_validation_deduplicates_matching_commands(tmp_path, monkeypatch):
         validation_path_prepend=[],
         validation_python=str(tmp_path / "Python314" / "python.exe"),
         validation_make=None,
+        no_validation_tool_autodiscover=True,
     )
 
     ok, result = runner.run_stage_validation(
@@ -212,7 +259,14 @@ def test_run_validation_returns_failure_context_when_commands_are_missing(tmp_pa
     goal_dir.mkdir()
     goal_file = goal_dir / "G00-missing-validation.md"
     goal_file.write_text("# Missing validation\n\n## Validation commands\n", encoding="utf-8")
-    args = SimpleNamespace(workspace=tmp_path, validation_shell="powershell")
+    args = SimpleNamespace(
+        workspace=tmp_path,
+        validation_shell="powershell",
+        validation_path_prepend=[],
+        validation_python=None,
+        validation_make=None,
+        no_validation_tool_autodiscover=True,
+    )
     run_dir = tmp_path / ".codex-goals" / "runs" / "round-001-preverify-G00"
 
     ok, result = runner.run_validation(goal_file, args, run_dir, "preverify-G00")
@@ -232,7 +286,14 @@ def test_run_validation_includes_failed_command_log_excerpt(tmp_path, monkeypatc
     goal_dir.mkdir()
     goal_file = goal_dir / "G00-failing-validation.md"
     goal_file.write_text("## Validation commands\n\n```bash\nmake test\n```\n", encoding="utf-8")
-    args = SimpleNamespace(workspace=tmp_path, validation_shell="powershell")
+    args = SimpleNamespace(
+        workspace=tmp_path,
+        validation_shell="powershell",
+        validation_path_prepend=[],
+        validation_python=None,
+        validation_make=None,
+        no_validation_tool_autodiscover=True,
+    )
     run_dir = tmp_path / ".codex-goals" / "runs" / "round-001-preverify-G00"
 
     def fake_run_command(cmd, cwd, log_path=None, input_text=None, env=None):

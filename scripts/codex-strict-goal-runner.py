@@ -404,6 +404,43 @@ def path_entry_for_tool(raw: str) -> str:
     return str(path)
 
 
+def discover_windows_validation_tools() -> Dict[str, str]:
+    if not is_windows():
+        return {}
+
+    script = "\n".join(
+        [
+            "$ErrorActionPreference = 'Stop'",
+            "$pythonCommand = Get-Command python -ErrorAction SilentlyContinue",
+            "$python = if ($pythonCommand) { $pythonCommand.Source } else { $null }",
+            "$makeCommand = Get-Command make -ErrorAction SilentlyContinue",
+            "$makeItem = if ($makeCommand) { Get-Item $makeCommand.Source } else { $null }",
+            "$make = if ($makeItem -and $makeItem.Target) { $makeItem.Target[0] } elseif ($makeCommand) { $makeCommand.Source } else { $null }",
+            "[pscustomobject]@{python=$python; make=$make} | ConvertTo-Json -Compress",
+        ]
+    )
+    code, stdout, _ = run_command(
+        [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ],
+        cwd=Path.cwd(),
+    )
+    if code != 0 or not stdout.strip():
+        return {}
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {}
+    return {key: str(value) for key, value in data.items() if value}
+
+
 def build_validation_env(args: argparse.Namespace) -> Dict[str, str]:
     env = os.environ.copy()
     prepended: List[str] = []
@@ -415,12 +452,21 @@ def build_validation_env(args: argparse.Namespace) -> Dict[str, str]:
             prepended.append(path_entry_for_tool(raw))
 
     python_bin = getattr(args, "validation_python", None) or os.environ.get("CODEX_GOAL_RUNNER_PYTHON")
+    make_bin = getattr(args, "validation_make", None) or os.environ.get("CODEX_GOAL_RUNNER_MAKE")
+    if (
+        is_windows()
+        and not getattr(args, "no_validation_tool_autodiscover", False)
+        and (not python_bin or not make_bin)
+    ):
+        discovered = discover_windows_validation_tools()
+        python_bin = python_bin or discovered.get("python")
+        make_bin = make_bin or discovered.get("make")
+
     if python_bin:
         python_bin = python_bin.strip().strip('"')
         env["PYTHON"] = python_bin
         prepended.append(path_entry_for_tool(python_bin))
 
-    make_bin = getattr(args, "validation_make", None) or os.environ.get("CODEX_GOAL_RUNNER_MAKE")
     if make_bin:
         make_bin = make_bin.strip().strip('"')
         prepended.append(path_entry_for_tool(make_bin))
@@ -884,6 +930,7 @@ def main() -> int:
     parser.add_argument("--validation-path-prepend", action="append", default=[], help="Extra PATH entries for validation commands; repeatable and may contain OS path separators")
     parser.add_argument("--validation-python", default=None, help="Python executable used by Makefile validation through the PYTHON environment variable")
     parser.add_argument("--validation-make", default=None, help="Make executable path; its parent directory is prepended to validation PATH")
+    parser.add_argument("--no-validation-tool-autodiscover", action="store_true", help="Disable Windows Get-Command autodiscovery for validation Python and Make")
     parser.add_argument("--max-rounds", type=int, default=80, help="Overall loop limit")
     parser.add_argument("--max-attempts-per-goal", type=int, default=5, help="Stop after this many execution attempts per goal")
     parser.add_argument("--skip-git-repo-check", action="store_true", help="Pass --skip-git-repo-check to Codex and bypass local git check")

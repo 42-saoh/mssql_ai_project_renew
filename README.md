@@ -47,13 +47,18 @@ python -m pip install -r requirements-dev.txt
 python .\scripts\codex-strict-goal-runner.py --workspace . --goals-dir goals --sandbox workspace-write --approval never --auto-commit
 ```
 
-If Codex validation runs under a sandbox account that cannot resolve your interactive `python` or `make`, pass explicit validation tool paths. Prefer real executable locations or accessible installation directories over WinGet symlink shims:
+On Windows, the strict goal runner attempts to discover validation tools with the same PowerShell lookup used in an interactive shell:
 
 ```powershell
 $python = (Get-Command python).Source
 $makeCommand = Get-Command make
 $makeItem = Get-Item $makeCommand.Source
 $make = if ($makeItem.Target) { $makeItem.Target[0] } else { $makeCommand.Source }
+```
+
+If Codex validation runs under a sandbox account that cannot resolve your interactive `python` or `make`, pass the discovered paths explicitly:
+
+```powershell
 python .\scripts\codex-strict-goal-runner.py `
   --workspace . `
   --goals-dir goals `
@@ -64,7 +69,7 @@ python .\scripts\codex-strict-goal-runner.py `
   --validation-make $make
 ```
 
-The same settings can be supplied with `CODEX_GOAL_RUNNER_PYTHON`, `CODEX_GOAL_RUNNER_MAKE`, and `CODEX_GOAL_RUNNER_PATH_PREPEND`.
+The same settings can be supplied with `CODEX_GOAL_RUNNER_PYTHON`, `CODEX_GOAL_RUNNER_MAKE`, and `CODEX_GOAL_RUNNER_PATH_PREPEND`. Use `--no-validation-tool-autodiscover` when you want validation to use only the inherited environment and explicit flags.
 
 Goal validation currently calls `make test`, so Windows environments also need a working GNU Make executable on `PATH`. The strict goal runner executes outer validation at stage boundaries only:
 
