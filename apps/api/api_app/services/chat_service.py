@@ -1,14 +1,46 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from apps.api.api_app.auth import require_actor_id
 from apps.api.api_app.repositories import approval_repository, conversation_repository, run_repository
+from apps.api.api_app.services import metadata_service
 from apps.api.api_app.services.codex_runner_client import submit_codex_run
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist, summarize_user_message
+from plf_agent_contracts.codex_runner import ServiceCodexRunRequest, TargetRef
 from plf_agent_orchestration.graph import orchestrate_message
 from plf_agent_validation.redaction_validator import find_redaction_violations
+
+_RUNNER_INTENT_CONFIG = {
+    "SP_ANALYSIS": {
+        "object_type": "PROCEDURE",
+        "output_schema": "schemas/sp_analysis_result.schema.json",
+        "skills": ["runtime-sp-analysis", "runtime-output-validation", "runtime-policy-review"],
+    },
+    "DEPENDENCY_ANALYSIS": {
+        "object_type": "OBJECT",
+        "output_schema": "schemas/dependency_analysis_result.schema.json",
+        "skills": ["runtime-dependency-analysis", "runtime-output-validation", "runtime-policy-review"],
+    },
+    "TABLE_DESIGN": {
+        "object_type": "TABLE",
+        "output_schema": "schemas/table_design_preview.schema.json",
+        "skills": ["runtime-table-design-preview", "runtime-output-validation", "runtime-policy-review"],
+    },
+    "DRAFT_GENERATION": {
+        "object_type": "OBJECT",
+        "output_schema": "schemas/java_mybatis_draft_pack.schema.json",
+        "skills": ["runtime-java-mybatis-draft", "runtime-output-validation", "runtime-policy-review"],
+    },
+}
+
+_DOTTED_OBJECT_PATTERN = re.compile(
+    r"\b(?:(?P<db>[A-Za-z][A-Za-z0-9_-]{0,63})\.)?"
+    r"(?P<schema>[A-Za-z_][A-Za-z0-9_$#@]{0,127})\."
+    r"(?P<name>[A-Za-z_][A-Za-z0-9_$#@]{0,127})\b"
+)
 
 
 def create_chat_run(message: str, *, conversation_id: str | None = None, actor_id: str | None = None) -> dict[str, object]:
@@ -68,9 +100,18 @@ def create_chat_run(message: str, *, conversation_id: str | None = None, actor_i
     }
 
     if routed["route"] == "codex_runner" and routed["policyDecision"] == "ALLOW":
-        codex_run = submit_codex_run(_runner_request_for_gateway(routed, chat_run_id, conversation_id))
+        codex_run = submit_codex_run(_runner_request_for_gateway(routed, chat_run_id, conversation_id, message))
         response["codexRunId"] = codex_run["codexRunId"]
         response["fakeRunner"] = codex_run.get("fakeRunner")
+
+    if routed["route"] == "metadata_gateway" and routed["policyDecision"] == "ALLOW":
+        response["metadataSearch"] = _metadata_search_for_gateway(message)
+
+    if routed["route"] == "history_store" and routed["policyDecision"] == "ALLOW":
+        response["historyLookup"] = _history_lookup_for_conversation(
+            conversation_id,
+            exclude_chat_run_id=chat_run_id,
+        )
 
     if routed["policyDecision"] == "BLOCKED_OR_APPROVAL_REQUIRED":
         approval_id = f"approval_{uuid4().hex[:12]}"
@@ -150,14 +191,53 @@ def _runner_request_for_gateway(
     routed: dict[str, object],
     chat_run_id: str,
     conversation_id: str,
+    message: str,
 ) -> dict[str, object]:
-    request = dict(routed.get("runnerRequest") or {})
-    target = dict(request.get("target") or {})
-    target_key = str(target.get("targetKey") or request.get("targetKey") or "unresolved")
-    request["chatRunId"] = chat_run_id
-    request["conversationId"] = conversation_id
-    request["runType"] = str(request.get("runType") or routed["intent"])
-    request["targetKey"] = target_key
-    request["target"] = {"targetKey": target_key}
-    request["mode"] = "fake"
-    return request
+    runner_request = routed.get("runnerRequest")
+    run_type = str(runner_request.get("runType") if isinstance(runner_request, dict) else routed["intent"])
+    config = _RUNNER_INTENT_CONFIG.get(run_type, _RUNNER_INTENT_CONFIG["SP_ANALYSIS"])
+    target = _target_ref_for_runner(message, object_type=config["object_type"])
+    request = ServiceCodexRunRequest(
+        runType=run_type,
+        chatRunId=chat_run_id,
+        conversationId=conversation_id,
+        target=target,
+        skillAllowlist=list(config["skills"]),
+        outputSchema=str(config["output_schema"]),
+    ).to_dict()
+    return {key: value for key, value in request.items() if value is not None}
+
+
+def _metadata_search_for_gateway(message: str) -> dict[str, object]:
+    return metadata_service.search_metadata(message, db_profile_id="master", limit=20)
+
+
+def _history_lookup_for_conversation(conversation_id: str, *, exclude_chat_run_id: str) -> dict[str, object]:
+    items = [
+        _chat_run_to_api(run)
+        for run in run_repository.list_chat_runs()
+        if run["conversation_id"] == conversation_id and run["chat_run_id"] != exclude_chat_run_id
+    ]
+    return {
+        "source": "history_store",
+        "items": items,
+    }
+
+
+def _target_ref_for_runner(message: str, *, object_type: str) -> TargetRef:
+    match = _DOTTED_OBJECT_PATTERN.search(message or "")
+    db_profile_id = "master"
+    schema = "dbo"
+    name = "unresolved"
+    if match:
+        db_profile_id = match.group("db") or db_profile_id
+        schema = match.group("schema")
+        name = match.group("name")
+    target_key = f"{db_profile_id}.{object_type}.{schema}.{name}"
+    return TargetRef(
+        dbProfileId=db_profile_id,
+        objectType=object_type,
+        schema=schema,
+        name=name,
+        targetKey=target_key,
+    )

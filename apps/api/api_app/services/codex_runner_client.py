@@ -17,6 +17,7 @@ def submit_codex_run(request: dict) -> dict:
             "target": {"targetKey": target_key},
         }
     )
+    target = request.get("target") if isinstance(request.get("target"), dict) else {}
     record = {
         "codex_run_id": codex_run_id,
         "chat_run_id": request["chatRunId"],
@@ -26,9 +27,14 @@ def submit_codex_run(request: dict) -> dict:
         "runtime_profile": "runtime-readonly",
         "workspace_id": "pending",
         "status": "SUBMITTED",
-        "output_schema_name": "service_codex_run_result.schema.json",
+        "output_schema_name": request.get("outputSchema", "service_codex_run_result.schema.json"),
         "validation_status": "PENDING",
         "target_key": target_key,
+        "target_object_type": target.get("objectType"),
+        "target_schema": target.get("schema"),
+        "target_name": target.get("name"),
+        "tool_mode": request.get("toolMode", "EVIDENCE_BUNDLE_ONLY"),
+        "skill_allowlist": list(request.get("skillAllowlist", [])),
         "fake_runner_status": fake_result.get("status"),
         "fake_runner_proposal_count": len(fake_result.get("artifactProposals", [])),
         "fake_runner_blockers": list(fake_result.get("blockers", [])),

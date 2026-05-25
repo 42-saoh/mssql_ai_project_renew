@@ -1,0 +1,97 @@
+version: 0.1.0
+service: domainFeatureIntegration
+scope: g09-domain-feature-integration
+
+objective: Connect supported intents to metadata, history, and Codex Runner flows.
+
+integrationSurfaces:
+  orchestratorModule: packages/orchestration/src/plf_agent_orchestration/graph.py
+  chatService: apps/api/api_app/services/chat_service.py
+  metadataService: apps/api/api_app/services/metadata_service.py
+  codexRunnerGateway: apps/api/api_app/services/codex_runner_client.py
+  runRepository: apps/api/api_app/repositories/run_repository.py
+  openapiContract: spec/openapi/plf_db_agent_v2_openapi.yaml
+
+intentFlows:
+  METADATA_SEARCH:
+    route: metadata_gateway
+    serviceMethod: metadata_service.search_metadata
+    externalTool: search_metadata_objects
+    persistExternalResponse: false
+    downstreamSideEffects:
+      codexRunnerSubmission: false
+      artifactPersistence: false
+      approvalCreation: false
+  HISTORY_LOOKUP:
+    route: history_store
+    serviceMethod: run_repository.list_chat_runs
+    returnsSanitizedSummariesOnly: true
+    persistRawMessages: false
+    downstreamSideEffects:
+      codexRunnerSubmission: false
+      metadataGatewayProxy: false
+      artifactPersistence: false
+      approvalCreation: false
+  SP_ANALYSIS:
+    route: codex_runner
+    runType: SP_ANALYSIS
+    outputSchema: schemas/sp_analysis_result.schema.json
+    skillAllowlist:
+      - runtime-sp-analysis
+      - runtime-output-validation
+      - runtime-policy-review
+  DEPENDENCY_ANALYSIS:
+    route: codex_runner
+    runType: DEPENDENCY_ANALYSIS
+    outputSchema: schemas/dependency_analysis_result.schema.json
+    skillAllowlist:
+      - runtime-dependency-analysis
+      - runtime-output-validation
+      - runtime-policy-review
+  TABLE_DESIGN:
+    route: codex_runner
+    runType: TABLE_DESIGN
+    outputSchema: schemas/table_design_preview.schema.json
+    skillAllowlist:
+      - runtime-table-design-preview
+      - runtime-output-validation
+      - runtime-policy-review
+    previewOnly: true
+  DRAFT_GENERATION:
+    route: codex_runner
+    runType: DRAFT_GENERATION
+    outputSchema: schemas/java_mybatis_draft_pack.schema.json
+    skillAllowlist:
+      - runtime-java-mybatis-draft
+      - runtime-output-validation
+      - runtime-policy-review
+
+runnerRequestPolicy:
+  schemaVersion: ServiceCodexRunRequest.v1
+  policyFlagsMustAllBeFalse: true
+  toolMode: EVIDENCE_BUNDLE_ONLY
+  targetRefRequired: true
+  fakeRunnerStillReturnsProposalsOnly: true
+  proposalContentPersistenceInG09: false
+
+policyBoundaries:
+  streamlitCallsFastApiOnly: true
+  serviceRunnerReturnsProposalsOnly: true
+  validationGateControlsArtifactPersistence: true
+  rowDataAllowed: false
+  storedProcedureExecutionAllowed: false
+  freeSqlExecutionAllowed: false
+  ddlDmlApplyAllowed: false
+  sourceApplyAllowed: false
+  deployAllowed: false
+  rawPromptPersistenceAllowed: false
+  rawProviderResponsePersistenceAllowed: false
+  rawStoredProcedureDefinitionPersistenceAllowed: false
+  secretPersistenceAllowed: false
+  rootDevelopmentSkillsAllowedAtRuntime: false
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g09_domain_feature_integration.py
+    - tests/integration/test_g09_domain_flows.py
+    - tests/integration/test_g09_domain_routing_scaffold.py

@@ -249,6 +249,14 @@ components:
           type: [string, "null"]
         pgptFallbackReason:
           type: [string, "null"]
+        codexRunId:
+          type: string
+        fakeRunner:
+          type: object
+        metadataSearch:
+          $ref: "#/components/schemas/MetadataSearchResponse"
+        historyLookup:
+          $ref: "#/components/schemas/HistoryLookupResponse"
       additionalProperties: true
     ChatRunStatus:
       type: object
@@ -350,6 +358,17 @@ components:
         data:
           type: object
       additionalProperties: true
+    HistoryLookupResponse:
+      type: object
+      required: [source, items]
+      properties:
+        source:
+          const: history_store
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatRunStatus"
+      additionalProperties: false
     MetadataReadyResponse:
       type: object
       required: [ready]
