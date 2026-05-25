@@ -88,3 +88,6 @@ eval_lessons:
   - id: block_apply_and_deploy_requests
     suite: v2_blocked_request_paths
     case_id: g00_apply_or_deploy_requests_blocked
+  - id: block_stored_procedure_execution_phrases
+    suite: v2_blocked_request_paths
+    case_id: g00_stored_procedure_execution_phrases_blocked_before_side_effects

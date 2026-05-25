@@ -36,6 +36,10 @@ See the phase plan in `docs/release/v2-implementation-plan.md` after G12, or the
 - Required deliverables exist.
 - Tests for this phase pass.
 - No hard fail condition from `EVAL_SPEC.md` is introduced.
+- Stored procedure execution requests, including run/call/exec procedure forms
+  in English and Korean, including Korean object-particle forms, hard-block
+  before metadata gateway, runner submission, artifact persistence, or approval
+  side effects.
 
 ## Validation commands
 

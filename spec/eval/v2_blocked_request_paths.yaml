@@ -4,6 +4,8 @@ status: scaffold
 cases:
   - id: g00_apply_or_deploy_requests_blocked
     summary: Requests to apply DDL/DML, execute procedures, apply source, or deploy must be blocked without artifact persistence.
+  - id: g00_stored_procedure_execution_phrases_blocked_before_side_effects
+    summary: Run/call/exec stored-procedure requests in English and Korean, including Korean object-particle forms, must hard-block before metadata gateway, runner submission, artifact persistence, or approval side effects.
   - id: g02_blocked_paths_do_not_create_artifacts
     summary: Blocked requests must return a policy decision and must not create codex runs or persisted artifacts.
   - id: g03_blocked_api_requests_do_not_submit_runner_or_artifacts

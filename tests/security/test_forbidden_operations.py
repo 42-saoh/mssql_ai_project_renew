@@ -1,9 +1,27 @@
+import pytest
+
+from apps.api.api_app.repositories import (
+    approval_repository,
+    artifact_repository,
+    conversation_repository,
+    run_repository,
+    validation_repository,
+)
+from apps.api.api_app.services import chat_service
 from apps.api.api_app.services.mssql_mcp_client import (
     MssqlMcpClient,
     MssqlMcpClientError,
     is_blocked_mcp_tool_name,
 )
 from plf_agent_validation.redaction_validator import find_redaction_violations
+
+
+def _clear_repositories():
+    conversation_repository.clear()
+    run_repository.clear()
+    artifact_repository.clear()
+    validation_repository.clear()
+    approval_repository.clear()
 
 
 def test_mssql_mcp_blocks_forbidden_tools():
@@ -37,3 +55,28 @@ def test_redaction_detects_raw_payloads():
     assert "RAW_PROMPT" in find_redaction_violations("raw prompt: hello")
     assert "SECRET" in find_redaction_violations("password=abc")
     assert "ROW_DATA" in find_redaction_violations("select * from users")
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "exec dbo.ProcessOrder",
+        "\uc800\uc7a5 \ud504\ub85c\uc2dc\uc800\ub97c \ud638\ucd9c\ud574\uc918",
+        "\ud504\ub85c\uc2dc\uc800\ub97c \uc2e4\ud589\ud574\uc918",
+        "SP\ub97c \uc2e4\ud589\ud574\uc918",
+    ],
+)
+def test_stored_procedure_execution_request_has_no_downstream_side_effects(message):
+    _clear_repositories()
+
+    response = chat_service.create_chat_run(message, actor_id="analyst-1")
+
+    assert response["status"] == "BLOCKED"
+    assert response["policyDecision"] == "BLOCKED"
+    assert response["route"] == "blocked"
+    assert "STORED_PROCEDURE_EXECUTION_BLOCKED" in response["blockers"]
+    assert "approvalId" not in response
+    assert "codexRunId" not in response
+    assert approval_repository.list_all() == []
+    assert run_repository.list_codex_runs() == []
+    assert artifact_repository.list_all() == []

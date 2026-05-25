@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from plf_agent_contracts.enums import Intent
 
+from .forbidden_operations import detect_forbidden_operation_blockers, has_hard_blocker
+
 FORBIDDEN_TERMS = [
     "row data",
     "select *",
@@ -16,11 +18,14 @@ FORBIDDEN_TERMS = [
 
 def policy_decision(message: str, intent: Intent) -> tuple[str, list[str]]:
     text = (message or "").lower()
-    blockers = [term for term in FORBIDDEN_TERMS if term in text]
+    blockers = detect_forbidden_operation_blockers(message)
+    blockers.extend(term for term in FORBIDDEN_TERMS if term in text and term not in blockers)
     if intent == Intent.BLOCKED:
         blockers.append("OUT_OF_DOMAIN")
     if intent == Intent.BLOCKED_OR_APPROVAL_REQUIRED and not blockers:
         blockers.append("MANUAL_REVIEW_REQUIRED")
     if blockers:
-        return "BLOCKED" if "OUT_OF_DOMAIN" in blockers else "BLOCKED_OR_APPROVAL_REQUIRED", blockers
+        if "OUT_OF_DOMAIN" in blockers or has_hard_blocker(blockers):
+            return "BLOCKED", blockers
+        return "BLOCKED_OR_APPROVAL_REQUIRED", blockers
     return "ALLOW", []

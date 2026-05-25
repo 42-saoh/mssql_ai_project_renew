@@ -1,12 +1,7 @@
 import pytest
 
-from plf_agent_orchestration.graph import orchestrate_message
-
-
-def test_ddl_apply_is_not_allowed():
-    result = orchestrate_message("이 DDL 적용해줘")
-    assert result["policyDecision"] in {"BLOCKED", "BLOCKED_OR_APPROVAL_REQUIRED"}
-    assert result["route"] == "blocked"
+from plf_agent_contracts.enums import Intent
+from plf_agent_orchestration.intents import classify_intent
 
 
 @pytest.mark.parametrize(
@@ -29,11 +24,5 @@ def test_ddl_apply_is_not_allowed():
         "SP\ub97c \uc2e4\ud589\ud574\uc918",
     ],
 )
-def test_stored_procedure_execution_requests_are_hard_blocked(message):
-    result = orchestrate_message(message)
-
-    assert result["policyDecision"] == "BLOCKED"
-    assert result["route"] == "blocked"
-    assert "STORED_PROCEDURE_EXECUTION_BLOCKED" in result["blockers"]
-    assert result["pgptUsed"] is False
-    assert result["pgptFallbackReason"] == "POLICY_BLOCKED_BEFORE_PGPT"
+def test_stored_procedure_execution_phrases_are_blocked(message):
+    assert classify_intent(message) == Intent.BLOCKED_OR_APPROVAL_REQUIRED

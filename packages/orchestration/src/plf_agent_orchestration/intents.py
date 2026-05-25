@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from plf_agent_contracts.enums import Intent
 
+from .forbidden_operations import detect_forbidden_operation_blockers
+
 BLOCKED_EXECUTION_KEYWORDS = [
     "실행", "적용", "apply", "execute", "run sql", "ddl 적용", "dml", "프로시저 실행", "sp 실행",
 ]
@@ -14,6 +16,9 @@ DB_DOMAIN_KEYWORDS = [
 
 def classify_intent(message: str) -> Intent:
     text = (message or "").lower()
+
+    if detect_forbidden_operation_blockers(message):
+        return Intent.BLOCKED_OR_APPROVAL_REQUIRED
 
     if any(keyword in text for keyword in BLOCKED_EXECUTION_KEYWORDS):
         return Intent.BLOCKED_OR_APPROVAL_REQUIRED
