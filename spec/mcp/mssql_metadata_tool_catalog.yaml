@@ -121,6 +121,9 @@ responsePolicy:
   noRowData: true
   noSecrets: true
   noRawPromptOrProviderPayloads: true
+  noRawStoredProcedureDefinitions: true
+  noConnectionStringsInSafeDiagnostics: true
+  noCredentialsInSafeDiagnostics: true
 
 responseEnvelope:
   success:

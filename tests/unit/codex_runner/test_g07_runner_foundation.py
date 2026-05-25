@@ -169,6 +169,63 @@ def test_submit_real_run_blocks_unsafe_inputs_before_codex_exec(tmp_path):
     assert called is False
 
 
+def test_submit_real_run_blocks_row_data_evidence_before_codex_exec(tmp_path):
+    called = False
+
+    def fake_codex(command, **kwargs):
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess(command, 0)
+
+    result = submit_real_run(
+        _request(),
+        {"data": {"rows": [{"customer": "alice"}]}},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert "ROW_DATA" in result["blockers"]
+    assert "alice" not in serialized
+    assert called is False
+
+
+@pytest.mark.parametrize(
+    ("evidence_bundle", "violation"),
+    [
+        ({"procedureDefinition": "AS BEGIN SELECT 1 END"}, "RAW_SP"),
+        ({"definition": "AS BEGIN SELECT 1 END"}, "RAW_SP"),
+        ({"diagnostics": "Server=tcp:prod;Database=ERP;Integrated Security=True;"}, "CONNECTION_STRING"),
+    ],
+)
+def test_submit_real_run_blocks_raw_sp_and_connection_string_inputs_before_codex_exec(
+    tmp_path, evidence_bundle, violation
+):
+    called = False
+
+    def fake_codex(command, **kwargs):
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess(command, 0)
+
+    result = submit_real_run(
+        _request(),
+        evidence_bundle,
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert violation in result["blockers"]
+    assert "server=" not in serialized.lower()
+    assert "select 1" not in serialized.lower()
+    assert called is False
+
+
 def test_submit_real_run_returns_safe_blocked_envelope_for_unsafe_output(tmp_path):
     def fake_codex(command, **kwargs):
         workspace = Path(command[command.index("--cd") + 1])
@@ -190,6 +247,50 @@ def test_submit_real_run_returns_safe_blocked_envelope_for_unsafe_output(tmp_pat
     assert "RAW_PROMPT" in result["blockers"]
     assert "raw prompt" not in serialized
     assert "summarize this secret" not in serialized
+
+
+def test_submit_real_run_returns_safe_blocked_envelope_for_raw_sp_output(tmp_path):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["debug"] = {"definition": "AS BEGIN SELECT 1 END"}
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert "RAW_SP" in result["blockers"]
+    assert "select 1" not in serialized.lower()
+
+
+def test_submit_real_run_returns_safe_blocked_envelope_for_row_data_output(tmp_path):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["debug"] = {"records": [{"customer": "alice"}]}
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert "ROW_DATA" in result["blockers"]
+    assert "alice" not in serialized
 
 
 def test_submit_real_run_returns_safe_blocked_envelope_when_final_output_missing(tmp_path):

@@ -14,6 +14,25 @@ _KO_ROW_DATA = re.compile(
     re.I,
 )
 
+_RAW_SP_TEXT = re.compile(r"\b(?:create\s+(?:or\s+alter\s+)?|alter\s+)proc(?:edure)?\b", re.I)
+_RAW_SP_FIELD = re.compile(
+    r'"?(?:stored[_ -]?procedure[_ -]?definition|procedure[_ -]?definition|'
+    r'proc(?:edure)?[_ -]?(?:definition|body|source|sql)|raw[_ -]?sql|source[_ -]?sql)"?\s*[:=]',
+    re.I,
+)
+_SQL_DEFINITION_FIELD = re.compile(
+    r'"?(?:definition|sql[_ -]?definition)"?\s*[:=]\s*"?(?:\\.|[^"\\]){0,1000}'
+    r"\b(?:as|begin|select|insert|update|delete|merge|exec(?:ute)?)\b",
+    re.I | re.S,
+)
+_CONNECTION_STRING = re.compile(
+    r'(?:"?connection[_ -]?string"?\s*[:=])|'
+    r"\b(?:server|data source|address|addr|network address)\s*=\s*[^;\r\n]{1,200};\s*"
+    r"(?:(?:initial catalog|database|uid|user id|trusted_connection|integrated security|"
+    r"password|pwd|encrypt)\s*=\s*[^;\r\n]{0,200};?){1,}",
+    re.I,
+)
+
 _PATTERNS = {
     "RAW_PROMPT": re.compile(r"raw[_ -]?prompt", re.I),
     "RAW_PROVIDER_RESPONSE": re.compile(r"raw[_ -]?provider|provider[_ -]?response", re.I),
@@ -21,8 +40,16 @@ _PATTERNS = {
         r"\b(row data|actual rows?|actual records?|sample data|table data|select \* from)\b",
         re.I,
     ),
-    "SECRET": re.compile(r'\b"?(password|secret|api[_-]?key|token)"?\s*[:=]', re.I),
-    "RAW_SP": re.compile(r"\bcreate\s+(or\s+alter\s+)?proc(edure)?\b", re.I),
+    "CONNECTION_STRING": _CONNECTION_STRING,
+    "SECRET": re.compile(
+        r'\b"?(password|pwd|secret|api[_-]?key|token|access[_ -]?token|client[_ -]?secret|'
+        r'authorization|uid|user\s+id)"?\s*[:=]',
+        re.I,
+    ),
+    "RAW_SP": re.compile(
+        rf"(?:{_RAW_SP_TEXT.pattern})|(?:{_RAW_SP_FIELD.pattern})|(?:{_SQL_DEFINITION_FIELD.pattern})",
+        re.I | re.S,
+    ),
 }
 
 

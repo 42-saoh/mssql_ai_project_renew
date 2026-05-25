@@ -55,6 +55,10 @@ def test_redaction_detects_raw_payloads():
     assert "RAW_PROMPT" in find_redaction_violations("raw prompt: hello")
     assert "SECRET" in find_redaction_violations("password=abc")
     assert "ROW_DATA" in find_redaction_violations("select * from users")
+    assert "CONNECTION_STRING" in find_redaction_violations(
+        "Server=tcp:prod;Database=ERP;Integrated Security=True;"
+    )
+    assert "RAW_SP" in find_redaction_violations('{"procedureDefinition":"AS BEGIN SELECT 1 END"}')
 
 
 @pytest.mark.parametrize(

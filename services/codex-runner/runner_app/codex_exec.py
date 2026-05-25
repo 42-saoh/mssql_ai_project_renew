@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from .workspace import assert_runtime_workspace
+
 DEFAULT_OUTPUT_SCHEMA = "schemas/output.schema.json"
 DEFAULT_TIMEOUT_SECONDS = 600
 
@@ -54,6 +56,7 @@ def run_codex_exec(
     run_command: Callable[..., subprocess.CompletedProcess[str]] | None = None,
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
-    command = build_codex_exec_command(workspace, output_schema)
+    workspace_path = assert_runtime_workspace(workspace)
+    command = build_codex_exec_command(workspace_path, output_schema)
     runner = run_command or subprocess.run
     return runner(command, check=False, text=True, capture_output=True, timeout=timeout_seconds)

@@ -75,10 +75,16 @@ def test_allowed_metadata_tool_names_are_not_classified_as_blocked(tool_name):
     ("arguments", "violation"),
     [
         ({"dbProfileId": "master", "query": "select * from users"}, "ROW_DATA"),
+        ({"dbProfileId": "master", "query": "select name from dbo.Customer"}, "ROW_DATA"),
         ({"dbProfileId": "master", "query": "drop table dbo.X"}, "DDL_DML_APPLY"),
         ({"dbProfileId": "master", "query": "execute dbo.ProcessOrder"}, "SQL_EXECUTION"),
         ({"dbProfileId": "master", "rawPrompt": "hello"}, "RAW_PROMPT"),
         ({"dbProfileId": "master", "password": "secret"}, "SECRET"),
+        ({"dbProfileId": "master", "procedureDefinition": "AS BEGIN SELECT 1 END"}, "RAW_SP"),
+        (
+            {"dbProfileId": "master", "query": "Server=tcp:prod;Database=ERP;Integrated Security=True;"},
+            "CONNECTION_STRING",
+        ),
     ],
 )
 def test_unsafe_arguments_fail_before_transport(arguments, violation):
@@ -127,8 +133,20 @@ def test_tool_success_response_must_match_requested_tool_name():
     ("response", "violation"),
     [
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"sample": "select * from users"}}, "ROW_DATA"),
+        ({"ok": True, "toolName": "search_metadata_objects", "data": {"rows": [{"customer": "alice"}]}}, "ROW_DATA"),
+        ({"ok": True, "toolName": "search_metadata_objects", "data": {"records": [{"customer": "alice"}]}}, "ROW_DATA"),
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"password": "abc"}}, "SECRET"),
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"definition": "create procedure dbo.X as select 1"}}, "RAW_SP"),
+        ({"ok": True, "toolName": "search_metadata_objects", "data": {"procedureDefinition": "AS BEGIN SELECT 1 END"}}, "RAW_SP"),
+        ({"ok": True, "toolName": "search_metadata_objects", "data": {"definition": "AS BEGIN SELECT 1 END"}}, "RAW_SP"),
+        (
+            {
+                "ok": True,
+                "toolName": "search_metadata_objects",
+                "diagnostics": "Server=tcp:prod;Database=ERP;Integrated Security=True;",
+            },
+            "CONNECTION_STRING",
+        ),
     ],
 )
 def test_unsafe_external_responses_fail_closed(response, violation):
@@ -163,4 +181,31 @@ def test_http_error_body_is_sanitized_before_platform_response():
     assert response["error"]["details"] == {
         "path": "/tools/search_metadata_objects/invoke",
         "httpStatus": 400,
+    }
+
+
+def test_http_error_body_with_connection_string_is_sanitized_before_platform_response():
+    body = (
+        b'{"error":{"code":"CONNECT_FAILED","message":"login failed for Server=tcp:prod;Database=ERP;'
+        b'Integrated Security=True;","details":{"connectionString":"Server=tcp:prod;Database=ERP;"}}}'
+    )
+    error = urllib.error.HTTPError(
+        url="http://mcp.example/tools/search_metadata_objects/invoke",
+        code=503,
+        msg="Service Unavailable",
+        hdrs={},
+        fp=BytesIO(body),
+    )
+
+    safe_error = MssqlMcpClient()._http_error("/tools/search_metadata_objects/invoke", error)
+    response = safe_error.to_response()
+
+    rendered = str(response).lower()
+    assert response["error"]["code"] == "MCP_HTTP_ERROR"
+    assert "server=" not in rendered
+    assert "connectionstring" not in rendered
+    assert "erp" not in rendered
+    assert response["error"]["details"] == {
+        "path": "/tools/search_metadata_objects/invoke",
+        "httpStatus": 503,
     }

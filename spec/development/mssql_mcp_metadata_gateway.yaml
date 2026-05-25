@@ -82,6 +82,9 @@ responsePolicy:
   responseMayNotExposeRowData: true
   responseMayNotExposeSecrets: true
   responseMayNotExposeRawPromptOrProviderPayloads: true
+  responseMayNotExposeRawStoredProcedureDefinitions: true
+  safeErrorsMayNotExposeConnectionStrings: true
+  safeErrorsMayNotExposeCredentials: true
 
 metadataSearch:
   externalToolName: search_metadata_objects

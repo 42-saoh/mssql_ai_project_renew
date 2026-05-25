@@ -44,8 +44,10 @@ def test_g06_allowed_tool_contract_matches_client_and_catalog():
 
 def test_g06_contract_preserves_metadata_gateway_policy_boundaries():
     spec = _spec()
+    catalog = _load_yaml(spec["externalBoundary"]["toolCatalogContract"])
     blocked = spec["blockedBeforeProxy"]
     response_policy = spec["responsePolicy"]
+    catalog_response_policy = catalog["responsePolicy"]
 
     assert blocked["rowData"] is True
     assert blocked["storedProcedureExecution"] is True
@@ -60,6 +62,12 @@ def test_g06_contract_preserves_metadata_gateway_policy_boundaries():
     assert response_policy["failClosedOnUnsafeResponse"] is True
     assert response_policy["successEnvelopeRequiresRequestedToolName"] is True
     assert response_policy["safeErrorEnvelopeOnly"] is True
+    assert response_policy["responseMayNotExposeRawStoredProcedureDefinitions"] is True
+    assert response_policy["safeErrorsMayNotExposeConnectionStrings"] is True
+    assert response_policy["safeErrorsMayNotExposeCredentials"] is True
+    assert catalog_response_policy["noRawStoredProcedureDefinitions"] is True
+    assert catalog_response_policy["noConnectionStringsInSafeDiagnostics"] is True
+    assert catalog_response_policy["noCredentialsInSafeDiagnostics"] is True
 
 
 def test_g06_metadata_routes_are_declared_in_openapi():

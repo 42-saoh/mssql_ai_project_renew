@@ -65,7 +65,7 @@ def test_g06_eval_unsafe_response_fails_closed():
         return {
             "ok": True,
             "toolName": "search_metadata_objects",
-            "data": {"definition": "create procedure dbo.X as select 1"},
+            "data": {"procedureDefinition": "AS BEGIN SELECT 1 END"},
         }
 
     with pytest.raises(MssqlMcpClientError) as exc_info:
@@ -76,3 +76,21 @@ def test_g06_eval_unsafe_response_fails_closed():
 
     assert exc_info.value.code == "MCP_RESPONSE_BLOCKED"
     assert "RAW_SP" in exc_info.value.details["violations"]
+
+
+def test_g06_eval_connection_string_diagnostics_fail_closed():
+    def transport(method, path, payload):
+        return {
+            "ok": True,
+            "toolName": "search_metadata_objects",
+            "diagnostics": "Server=tcp:prod;Database=ERP;Integrated Security=True;",
+        }
+
+    with pytest.raises(MssqlMcpClientError) as exc_info:
+        MssqlMcpClient(transport=transport).invoke_tool(
+            "search_metadata_objects",
+            {"dbProfileId": "master", "query": "procedure X"},
+        )
+
+    assert exc_info.value.code == "MCP_RESPONSE_BLOCKED"
+    assert "CONNECTION_STRING" in exc_info.value.details["violations"]

@@ -115,3 +115,25 @@ def test_unsafe_external_response_is_not_returned_to_platform():
     assert "select *" not in rendered
     assert "alice" not in rendered
     assert "ROW_DATA" in response["error"]["details"]["violations"]
+
+
+def test_connection_string_external_diagnostic_is_not_returned_to_platform():
+    def transport(method, path, payload):
+        return {
+            "ok": True,
+            "toolName": "search_metadata_objects",
+            "diagnostics": "Server=tcp:prod;Database=ERP;Integrated Security=True;",
+        }
+
+    with pytest.raises(MssqlMcpClientError) as exc_info:
+        MssqlMcpClient(transport=transport).invoke_tool(
+            "search_metadata_objects",
+            {"dbProfileId": "master", "query": "customer"},
+        )
+
+    assert exc_info.value.code == "MCP_RESPONSE_BLOCKED"
+    response = exc_info.value.to_response()
+    rendered = str(response).lower()
+    assert "server=" not in rendered
+    assert "erp" not in rendered
+    assert "CONNECTION_STRING" in response["error"]["details"]["violations"]

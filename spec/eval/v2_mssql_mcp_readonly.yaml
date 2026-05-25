@@ -11,4 +11,4 @@ cases:
   - id: g06_blocked_mcp_tools_and_unsafe_payloads_do_not_reach_transport
     summary: Blocked, unknown, execution, mutation, row-data, raw-payload, and secret MCP requests must fail before external transport.
   - id: g06_unsafe_mcp_responses_fail_closed
-    summary: External MCP responses containing row data, secrets, raw payloads, or mismatched tool envelopes must fail closed with safe diagnostics only.
+    summary: External MCP responses containing row data, secrets, connection strings, raw payloads, raw stored procedure definitions, or mismatched tool envelopes must fail closed with safe diagnostics only.

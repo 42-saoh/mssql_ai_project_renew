@@ -1,6 +1,11 @@
+from pathlib import Path
+
 import pytest
 
-from runner_app.codex_exec import CodexExecCommandError, build_codex_exec_command, normalize_output_schema
+from runner_app.codex_exec import CodexExecCommandError, build_codex_exec_command, normalize_output_schema, run_codex_exec
+from runner_app.workspace import WorkspaceContractError
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_codex_exec_command_is_bound_to_runtime_workspace_and_readonly():
@@ -43,3 +48,16 @@ def test_codex_exec_command_normalizes_bare_runtime_schema_name():
 def test_codex_exec_command_rejects_schema_paths_outside_runtime_schemas(output_schema):
     with pytest.raises(CodexExecCommandError):
         normalize_output_schema(output_schema)
+
+
+def test_run_codex_exec_rejects_development_root_before_runner_called():
+    called = False
+
+    def fake_runner(command, **kwargs):
+        nonlocal called
+        called = True
+
+    with pytest.raises(WorkspaceContractError):
+        run_codex_exec(ROOT, run_command=fake_runner)
+
+    assert called is False

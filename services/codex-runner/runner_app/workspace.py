@@ -48,8 +48,7 @@ def write_run_inputs(
     evidence_bundle: dict[str, Any] | None = None,
     tool_catalog: dict[str, Any] | None = None,
 ) -> None:
-    workspace_path = Path(workspace).resolve()
-    _assert_workspace_contract(workspace_path)
+    workspace_path = assert_runtime_workspace(workspace)
     input_dir = workspace_path / "input"
     _write_json(input_dir / "run_request.json", request)
     _write_json(input_dir / "evidence_bundle.json", evidence_bundle or {})
@@ -59,6 +58,13 @@ def write_run_inputs(
 
 def cleanup_workspace(path: str | Path) -> None:
     shutil.rmtree(path, ignore_errors=True)
+
+
+def assert_runtime_workspace(workspace: str | Path) -> Path:
+    workspace_path = Path(workspace).resolve()
+    _assert_workspace_contract(workspace_path)
+    _assert_no_symlinks(workspace_path)
+    return workspace_path
 
 
 def _resolve_runtime_template(runtime_template: str | Path) -> Path:
