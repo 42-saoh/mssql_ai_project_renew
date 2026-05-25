@@ -36,10 +36,16 @@ See the phase plan in `docs/release/v2-implementation-plan.md` after G12, or the
 - Required deliverables exist.
 - Tests for this phase pass.
 - No hard fail condition from `EVAL_SPEC.md` is introduced.
+- Unsafe artifact review markers that contain raw prompt, raw provider
+  response, or secret markers must be blocked before artifact persistence;
+  API responses must report `RAW_PROMPT`, `RAW_PROVIDER_RESPONSE`, and
+  `SECRET` blocker codes while persisted validation records keep only
+  sanitized blocker codes and empty review markers.
 
 ## Validation commands
 
 ```bash
+python -m pytest tests/security/test_g02_schema_security.py::test_blocked_artifact_review_markers_are_not_persisted_raw -q
 make test
 ```
 
