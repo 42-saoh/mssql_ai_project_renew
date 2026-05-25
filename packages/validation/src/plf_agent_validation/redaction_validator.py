@@ -14,22 +14,37 @@ _KO_ROW_DATA = re.compile(
     re.I,
 )
 
-_RAW_SP_TEXT = re.compile(r"\b(?:create\s+(?:or\s+alter\s+)?|alter\s+)proc(?:edure)?\b", re.I)
+_RAW_SP_TEXT = re.compile(
+    r"\b(?:create\s+(?:or\s+(?:alter|replace)\s+)?|alter\s+)proc(?:edure)?\b",
+    re.I,
+)
+_SQL_DEFINITION_FIELD_NAME = (
+    r"definition|definition[_ -]?text|sql[_ -]?definition|sql[_ -]?text|"
+    r"object[_ -]?(?:definition|source)|module[_ -]?(?:definition|body|source)|"
+    r"routine[_ -]?(?:definition|body)|source[_ -]?text|body[_ -]?text"
+)
 _RAW_SP_FIELD = re.compile(
     r'"?(?:stored[_ -]?procedure[_ -]?definition|procedure[_ -]?definition|'
-    r'proc(?:edure)?[_ -]?(?:definition|body|source|sql)|raw[_ -]?sql|source[_ -]?sql)"?\s*[:=]',
+    r'proc(?:edure)?[_ -]?(?:definition|body|source|sql)|'
+    r'raw[_ -]?sql|source[_ -]?sql)"?\s*[:=]',
     re.I,
 )
 _SQL_DEFINITION_FIELD = re.compile(
-    r'"?(?:definition|sql[_ -]?definition)"?\s*[:=]\s*"?(?:\\.|[^"\\]){0,1000}'
+    rf'"?(?:{_SQL_DEFINITION_FIELD_NAME})"?\s*[:=]\s*"?(?:\\.|[^"\\]){{0,1000}}'
     r"\b(?:as|begin|select|insert|update|delete|merge|exec(?:ute)?)\b",
     re.I | re.S,
 )
+_CONNECTION_KEY = (
+    r"driver|server|data\s+source|address|addr|network\s+address|initial\s+catalog|"
+    r"database(?:\s*name)?|uid|user\s+id|trusted[_\s-]?connection|"
+    r"integrated\s*security|password|pwd|encrypt|authentication|"
+    r"trust\s*server\s*certificate"
+)
 _CONNECTION_STRING = re.compile(
     r'(?:"?connection[_ -]?string"?\s*[:=])|'
-    r"\b(?:server|data source|address|addr|network address)\s*=\s*[^;\r\n]{1,200};\s*"
-    r"(?:(?:initial catalog|database|uid|user id|trusted_connection|integrated security|"
-    r"password|pwd|encrypt)\s*=\s*[^;\r\n]{0,200};?){1,}",
+    r"jdbc:sqlserver://[^\s\"']{1,500}|sqlserver://[^\s\"']{1,500}|"
+    rf"\b(?:{_CONNECTION_KEY})\s*=\s*[^;\r\n\"']{{1,200}};\s*"
+    rf"(?:(?:{_CONNECTION_KEY})\s*=\s*[^;\r\n\"']{{0,200}};?\s*){{1,}}",
     re.I,
 )
 

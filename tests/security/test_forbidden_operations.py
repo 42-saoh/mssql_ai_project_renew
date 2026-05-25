@@ -64,6 +64,31 @@ def test_redaction_detects_raw_payloads():
 @pytest.mark.parametrize(
     "payload",
     [
+        '{"definitionText":"AS BEGIN SELECT name FROM dbo.Customer END"}',
+        '{"routineBody":"BEGIN EXEC dbo.ProcessOrder END"}',
+        '{"moduleDefinition":"SET ANSI_NULLS ON GO AS BEGIN UPDATE dbo.Customer SET Name = Name END"}',
+        '{"sourceText":"CREATE OR REPLACE PROCEDURE dbo.SyncOrder AS BEGIN SELECT 1 END"}',
+    ],
+)
+def test_redaction_detects_stored_procedure_definition_shapes(payload):
+    assert "RAW_SP" in find_redaction_violations(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "Data Source=prod-sql;Initial Catalog=ERP;Integrated Security=SSPI;",
+        "jdbc:sqlserver://prod.database.windows.net:1433;databaseName=ERP;encrypt=true;",
+        "Driver={ODBC Driver 18 for SQL Server};Server=tcp:prod;Database=ERP;Trusted_Connection=yes;",
+    ],
+)
+def test_redaction_detects_connection_string_shapes(payload):
+    assert "CONNECTION_STRING" in find_redaction_violations(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
         "select name from dbo.Customer",
         '{"data":{"rows":[{"customer":"alice"}]}}',
         '{"data":{"records":[{"customer":"alice"}]}}',

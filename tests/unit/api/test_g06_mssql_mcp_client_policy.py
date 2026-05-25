@@ -139,6 +139,9 @@ def test_tool_success_response_must_match_requested_tool_name():
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"definition": "create procedure dbo.X as select 1"}}, "RAW_SP"),
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"procedureDefinition": "AS BEGIN SELECT 1 END"}}, "RAW_SP"),
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"definition": "AS BEGIN SELECT 1 END"}}, "RAW_SP"),
+        ({"ok": True, "toolName": "get_procedure_definition", "data": {"definitionText": "AS BEGIN SELECT name FROM dbo.Customer END"}}, "RAW_SP"),
+        ({"ok": True, "toolName": "get_procedure_definition", "data": {"routineBody": "BEGIN EXEC dbo.ProcessOrder END"}}, "RAW_SP"),
+        ({"ok": True, "toolName": "get_procedure_definition", "data": {"moduleDefinition": "AS BEGIN UPDATE dbo.Customer SET Name = Name END"}}, "RAW_SP"),
         (
             {
                 "ok": True,
@@ -204,6 +207,34 @@ def test_http_error_body_with_connection_string_is_sanitized_before_platform_res
     assert response["error"]["code"] == "MCP_HTTP_ERROR"
     assert "server=" not in rendered
     assert "connectionstring" not in rendered
+    assert "erp" not in rendered
+    assert response["error"]["details"] == {
+        "path": "/tools/search_metadata_objects/invoke",
+        "httpStatus": 503,
+    }
+
+
+def test_http_error_body_with_jdbc_connection_diagnostic_is_sanitized_before_platform_response():
+    body = (
+        b'{"error":{"code":"CONNECT_FAILED","message":"login failed for '
+        b'jdbc:sqlserver://prod.database.windows.net:1433;databaseName=ERP;encrypt=true;",'
+        b'"details":{"diagnostic":"Data Source=prod-sql;Initial Catalog=ERP;Integrated Security=SSPI;"}}}'
+    )
+    error = urllib.error.HTTPError(
+        url="http://mcp.example/tools/search_metadata_objects/invoke",
+        code=503,
+        msg="Service Unavailable",
+        hdrs={},
+        fp=BytesIO(body),
+    )
+
+    safe_error = MssqlMcpClient()._http_error("/tools/search_metadata_objects/invoke", error)
+    response = safe_error.to_response()
+
+    rendered = str(response).lower()
+    assert response["error"]["code"] == "MCP_HTTP_ERROR"
+    assert "jdbc:sqlserver" not in rendered
+    assert "data source" not in rendered
     assert "erp" not in rendered
     assert response["error"]["details"] == {
         "path": "/tools/search_metadata_objects/invoke",
