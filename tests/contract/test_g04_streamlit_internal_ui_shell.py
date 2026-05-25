@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import yaml
 
@@ -26,6 +27,7 @@ def test_g04_streamlit_shell_contract_files_exist():
 def test_g04_pages_use_declared_fastapi_client_methods():
     spec = yaml.safe_load(_read("spec/development/streamlit_internal_ui_shell.yaml"))
     client_text = _read(spec["apiBoundary"]["clientPath"])
+    client_methods = set(re.findall(r"^\s+def ([a-z_]+)\(", client_text, flags=re.MULTILINE))
 
     assert "import requests" in client_text
     assert "sqlalchemy" not in client_text
@@ -33,14 +35,19 @@ def test_g04_pages_use_declared_fastapi_client_methods():
     assert "runner_app" not in client_text
 
     for endpoint in spec["apiBoundary"]["endpoints"].values():
-        literal = endpoint.replace("{chatRunId}", "").replace("{conversationId}", "").replace("{artifactId}", "")
-        assert literal in client_text
+        literals = [part for part in re.split(r"\{[^}]+\}", endpoint) if part]
+        for literal in literals:
+            assert literal in client_text
 
     for page in spec["uiShell"]["pages"].values():
         text = _read(page["path"])
         assert "ApiClient(" in text
         assert "requests." not in text
+        declared_methods = set(page["apiClientMethods"])
+        called_methods = set(re.findall(r"\bclient\.([a-z_]+)\(", text))
+        assert called_methods <= declared_methods
         for method in page["apiClientMethods"]:
+            assert method in client_methods
             assert f"client.{method}(" in text
 
 

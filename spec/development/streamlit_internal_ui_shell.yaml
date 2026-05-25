@@ -24,8 +24,12 @@ uiShell:
     history:
       path: apps/streamlit/pages/02_History.py
       apiClientMethods:
+        - list_conversations
         - get_conversation
         - list_artifacts
+        - list_approvals
+        - get_approval
+        - resume_approval
       visibleStates:
         - SANITIZED ONLY
         - DRAFT
@@ -37,6 +41,7 @@ uiShell:
       apiClientMethods:
         - list_artifacts
         - get_artifact
+        - list_artifact_validations
       visibleStates:
         - DRAFT
         - MANUAL REVIEW REQUIRED
@@ -62,9 +67,14 @@ apiBoundary:
   endpoints:
     createChatRun: /api/v1/chat-runs
     getChatRun: /api/v1/chat-runs/{chatRunId}
+    listConversations: /api/v1/conversations
     getConversation: /api/v1/conversations/{conversationId}
     listArtifacts: /api/v1/artifacts
     getArtifact: /api/v1/artifacts/{artifactId}
+    listArtifactValidations: /api/v1/artifacts/{artifactId}/validations
+    listApprovals: /api/v1/approvals
+    getApproval: /api/v1/approvals/{approvalId}
+    resumeApproval: /api/v1/approvals/{approvalId}/resume
     health: /health
     metadataReady: /api/v1/metadata/ready
     metadataTools: /api/v1/metadata/tools
