@@ -15,7 +15,11 @@ def create_chat_run(message: str, *, conversation_id: str | None = None, actor_i
     actor = require_actor_id(actor_id)
     conversation_id = conversation_id or f"conv_{uuid4().hex[:12]}"
     chat_run_id = f"chatrun_{uuid4().hex[:12]}"
-    routed = orchestrate_message(message)
+    routed = orchestrate_message(
+        message,
+        conversation_id=conversation_id,
+        chat_run_id=chat_run_id,
+    )
     status = "ACCEPTED" if routed["policyDecision"] == "ALLOW" else "BLOCKED"
     now = _now()
 
@@ -49,6 +53,7 @@ def create_chat_run(message: str, *, conversation_id: str | None = None, actor_i
         "pgpt_model": routed.get("pgptModel"),
         "pgpt_fallback_reason": routed.get("pgptFallbackReason"),
         "pgpt_reason_summary": routed.get("pgptReasonSummary"),
+        "orchestrator_checkpoint": routed.get("checkpoint"),
         "created_at": now,
         "completed_at": now if status == "BLOCKED" else None,
     }
@@ -63,15 +68,9 @@ def create_chat_run(message: str, *, conversation_id: str | None = None, actor_i
     }
 
     if routed["route"] == "codex_runner" and routed["policyDecision"] == "ALLOW":
-        codex_run = submit_codex_run(
-            {
-                "chatRunId": chat_run_id,
-                "conversationId": conversation_id,
-                "runType": routed["intent"],
-                "targetKey": "unresolved",
-            }
-        )
+        codex_run = submit_codex_run(_runner_request_for_gateway(routed, chat_run_id, conversation_id))
         response["codexRunId"] = codex_run["codexRunId"]
+        response["fakeRunner"] = codex_run.get("fakeRunner")
 
     if routed["policyDecision"] == "BLOCKED_OR_APPROVAL_REQUIRED":
         approval_id = f"approval_{uuid4().hex[:12]}"
@@ -128,6 +127,7 @@ def _chat_run_to_api(record: dict) -> dict[str, object]:
         "pgptModel": record.get("pgpt_model"),
         "pgptFallbackReason": record.get("pgpt_fallback_reason"),
         "pgptReasonSummary": record.get("pgpt_reason_summary"),
+        "checkpoint": record.get("orchestrator_checkpoint"),
     }
 
 
@@ -144,3 +144,20 @@ def _safe_blockers(blockers: list[object]) -> list[str]:
         else:
             safe.append(text)
     return safe
+
+
+def _runner_request_for_gateway(
+    routed: dict[str, object],
+    chat_run_id: str,
+    conversation_id: str,
+) -> dict[str, object]:
+    request = dict(routed.get("runnerRequest") or {})
+    target = dict(request.get("target") or {})
+    target_key = str(target.get("targetKey") or request.get("targetKey") or "unresolved")
+    request["chatRunId"] = chat_run_id
+    request["conversationId"] = conversation_id
+    request["runType"] = str(request.get("runType") or routed["intent"])
+    request["targetKey"] = target_key
+    request["target"] = {"targetKey": target_key}
+    request["mode"] = "fake"
+    return request

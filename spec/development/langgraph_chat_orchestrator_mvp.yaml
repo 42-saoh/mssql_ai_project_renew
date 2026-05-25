@@ -1,0 +1,111 @@
+version: 0.1.0
+service: langGraphChatOrchestratorMvp
+scope: g05-langgraph-chat-orchestrator-mvp
+
+objective: Implement domain guard, intent routing, policy gate, checkpoint state, and fake runner routing.
+
+orchestrator:
+  graphModule: packages/orchestration/src/plf_agent_orchestration/graph.py
+  stateModule: packages/orchestration/src/plf_agent_orchestration/state.py
+  intentModule: packages/orchestration/src/plf_agent_orchestration/intents.py
+  policyGateModule: packages/orchestration/src/plf_agent_orchestration/policy_gate.py
+  graphEngine: langgraph.StateGraph
+  graphNodes:
+    - domain_guard
+    - policy_gate
+    - pgpt_intent_assist
+    - route_intent
+    - prepare_fake_runner
+
+domainGuard:
+  blocksGeneralChat: true
+  pgptMayNotAnswerGeneralChat: true
+  allowedDbIntents:
+    - SP_ANALYSIS
+    - METADATA_SEARCH
+    - DEPENDENCY_ANALYSIS
+    - TABLE_DESIGN
+    - DRAFT_GENERATION
+    - HISTORY_LOOKUP
+
+intentRouting:
+  SP_ANALYSIS: codex_runner
+  DEPENDENCY_ANALYSIS: codex_runner
+  TABLE_DESIGN: codex_runner
+  DRAFT_GENERATION: codex_runner
+  METADATA_SEARCH: metadata_gateway
+  HISTORY_LOOKUP: history_store
+  BLOCKED: blocked
+  BLOCKED_OR_APPROVAL_REQUIRED: blocked
+
+policyGate:
+  hardBlockedOperations:
+    - row_data_access
+    - stored_procedure_execution
+    - free_sql_execution
+    - source_apply_or_deploy
+  manualReviewOperations:
+    - ddl_dml_apply_request
+  blockedRequestsDoNotCallPgpt: true
+  blockedRequestsDoNotSubmitRunner: true
+  blockedRequestsDoNotPersistArtifacts: true
+
+checkpointState:
+  schemaVersion: OrchestratorCheckpoint.v1
+  persistedByApi: true
+  rawUserMessageStored: false
+  rawPromptStored: false
+  rawProviderResponseStored: false
+  rowDataStored: false
+  secretsStored: false
+  allowedFields:
+    - conversationId
+    - chatRunId
+    - sanitizedMessageSummary
+    - intent
+    - policyDecision
+    - blockers
+    - route
+    - targetKey
+    - evidenceBundleRef
+    - artifactIds
+    - reviewMarkers
+    - pgptUsed
+    - pgptModel
+    - pgptFallbackReason
+    - pgptReasonSummary
+    - steps
+    - runnerRequest
+
+fakeRunnerRouting:
+  gatewayModule: apps/api/api_app/services/codex_runner_client.py
+  fakeRunnerModule: services/codex_runner/runner_app/fake_runner.py
+  actualRuntimeExecutionInG05: false
+  submittedRunStatus: SUBMITTED
+  fakeRunnerMode: fake
+  persistFakeRunnerProposalContent: false
+  persistArtifactProposalsInG05: false
+  outputSchemaName: service_codex_run_result.schema.json
+  productionReadyAllowed: false
+
+apiIntegration:
+  chatService: apps/api/api_app/services/chat_service.py
+  routeModule: apps/api/api_app/routes/chat_runs.py
+  streamlitDirectAccessStillForbidden: true
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g05_langgraph_chat_orchestrator_mvp.py
+    - tests/unit/orchestration/test_g05_langgraph_mvp.py
+    - tests/integration/test_g05_chat_orchestrator_mvp.py
+    - tests/eval/test_g05_orchestrator_mvp_eval.py
+
+evalCases:
+  v2_domain_guard:
+    - g05_general_chat_blocked_before_pgpt_runner_or_metadata
+  v2_intent_routing:
+    - g05_supported_intents_route_to_expected_boundaries
+  v2_runner_policy:
+    - g05_fake_runner_routes_metadata_only_without_artifact_persistence
+  v2_blocked_request_paths:
+    - g05_hard_blocked_operations_have_no_downstream_side_effects

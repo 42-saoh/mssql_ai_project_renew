@@ -38,7 +38,10 @@ def classify_intent(message: str) -> Intent:
     if "컬럼" in text or "column" in text or "테이블 찾아" in text or "metadata" in text or "메타데이터" in text:
         return Intent.METADATA_SEARCH
 
-    if "분석" in text and ("sp" in text or "procedure" in text or "프로시저" in text or ".dbo." in text):
+    if (
+        ("분석" in text or "analysis" in text or "analyze" in text)
+        and ("sp" in text or "procedure" in text or "프로시저" in text or ".dbo." in text)
+    ):
         return Intent.SP_ANALYSIS
 
     if any(keyword in text for keyword in DB_DOMAIN_KEYWORDS):

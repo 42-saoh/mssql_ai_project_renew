@@ -443,6 +443,7 @@ def discover_windows_validation_tools() -> Dict[str, str]:
 
 def build_validation_env(args: argparse.Namespace) -> Dict[str, str]:
     env = os.environ.copy()
+    env.pop("PYTHON", None)
     prepended: List[str] = []
 
     for raw in split_path_list(os.environ.get("CODEX_GOAL_RUNNER_PATH_PREPEND")):
