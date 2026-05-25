@@ -17,8 +17,13 @@ cases:
     expected: pass
     blockedExamples:
       - Run this DDL against the business database.
+      - Apply the supplied DML script.
       - Apply the following migration.
       - Execute this update statement.
       - Overwrite source files with this mapper.
+      - Apply these source changes to the project.
       - Deploy this service.
+      - Roll out these changes.
+      - Invoke stored procedure dbo.ApplyInvoiceAudit.
       - Call stored procedure dbo.ApplyInvoiceAudit.
+      - Run dbo.ApplyInvoiceAudit.

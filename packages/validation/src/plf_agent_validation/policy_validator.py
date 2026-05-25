@@ -21,9 +21,12 @@ ALLOWED_ARTIFACT_TYPES = {
 RETIRED_ARTIFACT_TYPES = {"DDL_DRAFT", "VO_DRAFT", "MODEL_DRAFT"}
 
 _SQL_ACTION = r"(?:apply|run|execute|submit|issue)"
+_PROCEDURE_ACTION = r"(?:run|call|exec(?:ute)?|invoke)"
 _SOURCE_ACTION = r"(?:apply|overwrite|replace|write|patch)"
-_DEPLOY_ACTION = r"(?:deploy|release|roll\s*out)"
-_OPTIONAL_OUTPUT_REF = r"(?:(?:this|the\s+following|the|following|generated|provided)\s+)?"
+_DEPLOY_ACTION = r"(?:deploy|release|roll\s*out|promote|publish)"
+_OPTIONAL_OUTPUT_REF = (
+    r"(?:(?:this|these|the|following|generated|provided|supplied|proposed|new)\s+){0,3}"
+)
 _SQL_OBJECT_ACTION = r"(?:create|alter|drop)\s+(?:table|view|index|proc(?:edure)?|function|trigger)"
 _DML_ACTION = r"(?:insert|update|delete|merge)"
 _SQL_TARGET = (
@@ -32,17 +35,16 @@ _SQL_TARGET = (
 _SOURCE_TARGET = r"(?:source|source\s+code|code|files?|java\s+files?|mapper\s+files?)"
 _DEPLOY_TARGET = r"(?:service|application|app|artifact|build|code|changes?)"
 _SQL_IDENTIFIER = r"(?:\[?[A-Za-z_][\w$#@]*\]?)"
-_DOTTED_SQL_OBJECT = rf"{_SQL_IDENTIFIER}(?:\s*\.\s*{_SQL_IDENTIFIER}){{0,2}}"
+_DOTTED_SQL_OBJECT = rf"{_SQL_IDENTIFIER}\s*\.\s*{_SQL_IDENTIFIER}(?:\s*\.\s*{_SQL_IDENTIFIER})?"
 
 FORBIDDEN_OUTPUT_PATTERNS = [
     re.compile(rf"\b{_SQL_ACTION}\s+{_OPTIONAL_OUTPUT_REF}{_SQL_TARGET}\b", re.I),
     re.compile(rf"\b{_SQL_ACTION}\s+{_OPTIONAL_OUTPUT_REF}{_SQL_OBJECT_ACTION}\b", re.I),
     re.compile(rf"\b{_SQL_ACTION}\s+{_OPTIONAL_OUTPUT_REF}{_DML_ACTION}\b", re.I),
     re.compile(rf"\b{_SQL_TARGET}\s+(?:should\s+be\s+|must\s+be\s+|can\s+be\s+)?(?:applied|run|executed)\b", re.I),
-    re.compile(r"\b(?:run|call|exec(?:ute)?)\s+(?:(?:this|the|following)\s+)?(?:stored\s+)?(?:proc(?:edure)?|sp)\b", re.I),
+    re.compile(rf"\b{_PROCEDURE_ACTION}\s+{_OPTIONAL_OUTPUT_REF}(?:stored\s+)?(?:proc(?:edure)?|sp)\b", re.I),
     re.compile(r"\b(?:stored\s+)?(?:proc(?:edure)?|sp)\s+(?:should\s+be\s+|must\s+be\s+|can\s+be\s+)?(?:run|called|executed)\b", re.I),
-    re.compile(rf"\bexec(?:ute)?\s+{_DOTTED_SQL_OBJECT}", re.I),
-    re.compile(rf"\bcall\s+{_DOTTED_SQL_OBJECT}", re.I),
+    re.compile(rf"\b{_PROCEDURE_ACTION}\s+{_DOTTED_SQL_OBJECT}", re.I),
     re.compile(rf"\b{_SOURCE_ACTION}\s+{_OPTIONAL_OUTPUT_REF}{_SOURCE_TARGET}\b", re.I),
     re.compile(rf"\b{_SOURCE_TARGET}\s+(?:should\s+be\s+|must\s+be\s+|can\s+be\s+)?(?:applied|overwritten|replaced|patched|written)\b", re.I),
     re.compile(rf"\b{_DEPLOY_ACTION}\s+{_OPTIONAL_OUTPUT_REF}{_DEPLOY_TARGET}\b", re.I),

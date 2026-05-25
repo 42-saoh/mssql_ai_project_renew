@@ -63,6 +63,39 @@ def test_g10_artifact_validation_routes_persist_and_read_review_metadata():
     assert listing["items"][0]["artifactId"] == artifact_id
 
 
+def test_g10_artifact_validation_route_returns_only_sanitized_blocker_codes():
+    _clear_repositories()
+    client = TestClient(create_app())
+    unsafe_artifact_type = "UNSAFE<script> raw provider response: model payload token=abc"
+
+    response = client.post(
+        "/api/v1/artifacts/validated",
+        json={
+            "chatRunId": "chatrun_unsafe",
+            "proposal": {
+                "artifactType": unsafe_artifact_type,
+                "title": "Unsafe",
+                "contentMarkdown": "Generated proposal. REVIEW_REQUIRED.",
+                "evidenceRefs": ["evidence.1"],
+                "reviewMarkers": ["REVIEW_REQUIRED"],
+                "productionReady": False,
+            },
+        },
+    ).json()
+
+    rendered = str(response)
+    persisted = str(validation_repository.list_all())
+
+    assert response["status"] == "BLOCKED"
+    assert artifact_repository.list_all() == []
+    assert unsafe_artifact_type not in rendered
+    assert "<script>" not in rendered
+    assert "model payload" not in rendered
+    assert "token=abc" not in rendered
+    assert unsafe_artifact_type not in persisted
+    assert "REDACTION_VIOLATION_BLOCKED" in validation_repository.list_all()[0]["blocker_codes"]
+
+
 def test_g10_conversation_history_route_returns_sanitized_summaries():
     _clear_repositories()
     client = TestClient(create_app())

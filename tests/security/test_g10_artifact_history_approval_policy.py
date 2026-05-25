@@ -53,6 +53,36 @@ def test_g10_raw_payload_artifact_attempt_persists_only_safe_blocker_codes():
     assert "REDACTION_VIOLATION_BLOCKED" in validation_repository.list_all()[0]["blocker_codes"]
 
 
+def test_g10_blocked_artifact_response_does_not_reflect_unsafe_artifact_type():
+    _clear_repositories()
+    unsafe_artifact_type = "UNSAFE<script> raw provider response: model payload token=abc"
+
+    result = artifact_service.persist_validated_artifact_request(
+        {
+            "chatRunId": "chatrun_1",
+            "proposal": {
+                "artifactType": unsafe_artifact_type,
+                "title": "Unsafe",
+                "contentMarkdown": "Generated proposal. REVIEW_REQUIRED.",
+                "evidenceRefs": ["evidence.1"],
+                "reviewMarkers": ["REVIEW_REQUIRED"],
+                "productionReady": False,
+            },
+        }
+    )
+
+    rendered = str(result)
+    persisted = str(validation_repository.list_all())
+    assert result["status"] == "BLOCKED"
+    assert artifact_repository.list_all() == []
+    assert unsafe_artifact_type not in rendered
+    assert "<script>" not in rendered
+    assert "model payload" not in rendered
+    assert "token=abc" not in rendered
+    assert unsafe_artifact_type not in persisted
+    assert "REDACTION_VIOLATION_BLOCKED" in validation_repository.list_all()[0]["blocker_codes"]
+
+
 def test_g10_approval_resume_does_not_cross_execution_or_persistence_boundaries():
     _clear_repositories()
 
