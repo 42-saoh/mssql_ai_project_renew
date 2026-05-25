@@ -83,3 +83,21 @@ def test_artifact_service_blocks_invalid_or_production_ready_artifacts():
     assert result["status"] == "BLOCKED"
     assert "PRODUCTION_READY_TRUE_BLOCKED" in result["blockers"]
     assert artifact_repository.list_all() == []
+
+
+def test_artifact_service_blocks_preview_only_artifact_persistence():
+    _clear_repositories()
+    proposal = {
+        "artifactType": "TABLE_DESIGN_PREVIEW",
+        "title": "Preview",
+        "contentMarkdown": "Generated preview. REVIEW_REQUIRED.",
+        "evidenceRefs": ["evidence.1"],
+        "reviewMarkers": ["REVIEW_REQUIRED"],
+        "productionReady": False,
+    }
+
+    result = artifact_service.persist_artifact_after_validation(proposal, chat_run_id="chatrun_1")
+
+    assert result["status"] == "BLOCKED"
+    assert "NON_PERSISTABLE_ARTIFACT_TYPE:TABLE_DESIGN_PREVIEW" in result["blockers"]
+    assert artifact_repository.list_all() == []

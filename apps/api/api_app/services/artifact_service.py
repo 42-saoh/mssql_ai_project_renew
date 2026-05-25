@@ -7,7 +7,10 @@ from uuid import uuid4
 
 from apps.api.api_app.repositories import artifact_repository, validation_repository
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist, content_ref_for_artifact
+from plf_agent_contracts.enums import ArtifactType
 from plf_agent_validation.policy_validator import validate_runtime_result
+
+PERSISTABLE_ARTIFACT_TYPES = {artifact_type.value for artifact_type in ArtifactType}
 
 
 def list_artifacts() -> dict:
@@ -27,7 +30,8 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
         "artifactProposals": [proposal],
     }
     ok, blockers = validate_runtime_result(result)
-    if not ok:
+    blockers.extend(_persistence_blockers(proposal))
+    if not ok or blockers:
         validation_id = f"validation_{uuid4().hex[:12]}"
         validation = validation_repository.put(
             validation_id,
@@ -78,6 +82,21 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
         },
     )
     return {"status": "PERSISTED", "artifact": to_api_artifact(artifact), "validation": validation}
+
+
+def _persistence_blockers(proposal: dict) -> list[str]:
+    artifact_type = _artifact_type_value(proposal.get("artifactType"))
+    if artifact_type not in PERSISTABLE_ARTIFACT_TYPES:
+        return [f"NON_PERSISTABLE_ARTIFACT_TYPE:{artifact_type or 'MISSING'}"]
+    return []
+
+
+def _artifact_type_value(value: object) -> str:
+    if isinstance(value, ArtifactType):
+        return value.value
+    if value is None:
+        return ""
+    return str(value)
 
 
 def to_api_artifact(record: dict) -> dict:

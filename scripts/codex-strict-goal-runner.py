@@ -372,15 +372,44 @@ def parse_codex_result(result_path: Path) -> Dict[str, Any]:
         }
 
 
-def run_validation(goal_file: Path, args: argparse.Namespace, run_dir: Path, label: str) -> bool:
+def validation_failure_result(goal_file: Path, workspace: Path, label: str, reason: str, log_path: Optional[Path]) -> Dict[str, Any]:
+    current_rel = goal_relative(goal_file, workspace)
+    validation = reason
+    if log_path and log_path.exists():
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+        excerpt = text[-4000:] if len(text) > 4000 else text
+        validation = f"{reason}\n\nValidation log excerpt from {goal_relative(log_path, workspace)}:\n{excerpt}".strip()
+
+    return {
+        "status": "fail",
+        "goal_file": current_rel,
+        "earliest_failed_goal": current_rel,
+        "summary": f"{label} validation failed for {current_rel}.",
+        "changed_files": [],
+        "validation": validation,
+        "blockers": [reason],
+        "remaining_risks": ["The failed validation must be fixed before this goal can be marked done."],
+        "confidence": 1,
+    }
+
+
+def run_validation(goal_file: Path, args: argparse.Namespace, run_dir: Path, label: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
     text = read_file(goal_file)
     commands = extract_validation_commands(text)
     if not commands:
         print_step(f"No validation commands found for {goal_file.name}; treating validation as failed.")
-        (run_dir / f"{label}.validation.missing.log").write_text(
+        log_path = run_dir / f"{label}.validation.missing.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(
             "No validation commands found under ## Validation commands.\n", encoding="utf-8"
         )
-        return False
+        return False, validation_failure_result(
+            goal_file,
+            args.workspace,
+            label,
+            "No validation commands found under ## Validation commands.",
+            log_path,
+        )
 
     log_path = run_dir / f"{label}.validation.log"
     cmd = build_validation_command(commands, args.validation_shell)
@@ -388,15 +417,53 @@ def run_validation(goal_file: Path, args: argparse.Namespace, run_dir: Path, lab
     code, _, _ = run_command(cmd, cwd=args.workspace, log_path=log_path)
     if code == 0:
         print_step(f"Validation passed for {goal_file.name}")
-        return True
+        return True, None
     print_step(f"Validation failed for {goal_file.name}; see {log_path}")
-    return False
+    return False, validation_failure_result(
+        goal_file,
+        args.workspace,
+        label,
+        f"Validation command failed with exit code {code}: {commands}",
+        log_path,
+    )
 
 
-def build_execute_prompt(goal_file: Path, goals: List[Path], index: int, workspace: Path) -> str:
+def format_retry_context(result: Optional[Dict[str, Any]]) -> str:
+    if not result or result.get("status") == "pass":
+        return "- none"
+
+    lines = [
+        f"- status: {result.get('status', 'unknown')}",
+        f"- earliest_failed_goal: {result.get('earliest_failed_goal')}",
+    ]
+    summary = str(result.get("summary", "")).strip()
+    if summary:
+        lines.append(f"- summary: {summary}")
+    blockers = result.get("blockers") or []
+    if blockers:
+        lines.append("- blockers:")
+        lines.extend(f"  - {blocker}" for blocker in blockers)
+    validation = str(result.get("validation", "")).strip()
+    if validation:
+        lines.append(f"- validation: {validation}")
+    remaining_risks = result.get("remaining_risks") or []
+    if remaining_risks:
+        lines.append("- remaining_risks:")
+        lines.extend(f"  - {risk}" for risk in remaining_risks)
+    return "\n".join(lines)
+
+
+def build_execute_prompt(
+    goal_file: Path,
+    goals: List[Path],
+    index: int,
+    workspace: Path,
+    retry_result: Optional[Dict[str, Any]] = None,
+) -> str:
     previous = "\n".join(f"- {goal_relative(p, workspace)}" for p in goals[:index]) or "- none"
     current_rel = goal_relative(goal_file, workspace)
     all_goal_order = "\n".join(f"{i:02d}. {goal_relative(p, workspace)}" for i, p in enumerate(goals))
+    retry_context = format_retry_context(retry_result)
 
     return f"""
 You are running a STRICT SEQUENTIAL GOAL PIPELINE.
@@ -409,6 +476,9 @@ Current goal file: {current_rel}
 Previous goal files that must remain fully satisfied:
 {previous}
 
+Current retry context from the most recent failed verifier or execution:
+{retry_context}
+
 Hard rules:
 1. Execute exactly the current goal file: {current_rel}.
 2. Do NOT execute any later goal file.
@@ -420,12 +490,16 @@ Hard rules:
 8. Never weaken policy boundaries. Never copy legacy implementation code. Never merge Development Codex and Service Codex Runner realms.
 9. Do not install new dependencies, perform destructive changes, deploy, access production data, or apply DDL/DML unless the current goal explicitly permits it.
 10. Finish with JSON only, matching the provided schema.
+11. If retry context is not "- none", address those blockers explicitly before returning "pass"; if a blocker is not valid, explain why in summary and validation.
+12. Regression repair may include implementation, tests, specs, and root development goal documents up to and including {current_rel}. You may strengthen the current goal file or previous goal files when the retry context exposes missing acceptance criteria, missing validation commands, vague deliverables, or missing regression coverage.
+13. Do not edit later goal files. Do not weaken or delete any Objective, Non-goal, Constraint, Acceptance criterion, Validation command, Stop condition, safety policy, or realm boundary. Goal-document changes must make the contract stricter, clearer, or more verifiable.
 
 Definition of pass:
 - The current goal's acceptance criteria are satisfied.
 - The current goal's validation commands pass, or you clearly explain what command the outer runner must run.
 - All previous goals still appear satisfied.
 - No stop condition, non-goal, or constraint is violated.
+- If retry context identified a real gap, changed_files should include at least one implementation, test, spec, or goal-document change that directly closes or captures that gap.
 """.strip()
 
 
@@ -449,7 +523,8 @@ Hard rules:
 5. If any earlier goal is now not satisfied, return status "fail" and set earliest_failed_goal to that earlier Gxx file.
 6. If this goal is incomplete, return status "fail" and set earliest_failed_goal to {current_rel}.
 7. If blocked by missing context or ambiguous requirements, return status "blocked".
-8. Finish with JSON only, matching the provided schema.
+8. When returning "fail" or "blocked", make blockers actionable: identify the concrete implementation, test, spec, or goal-document gap that should be repaired. If the goal document is too vague to verify the intended contract, say that explicitly.
+9. Finish with JSON only, matching the provided schema.
 
 Important: The outer runner separately runs the goal's Validation commands. Your job is semantic acceptance verification.
 """.strip()
@@ -611,8 +686,11 @@ def main() -> int:
                 run_id = f"round-{rounds:03d}-preverify-G{j:02d}-{now_stamp()}"
                 run_dir = args.state_dir / "runs" / run_id
 
-                if not run_validation(goal_file, args, run_dir, f"preverify-G{j:02d}"):
+                validation_ok, validation_failure = run_validation(goal_file, args, run_dir, f"preverify-G{j:02d}")
+                if not validation_ok:
+                    state["goals"][j]["last_result"] = validation_failure
                     regression_idx = j
+                    save_state(state_file, state)
                     break
 
                 if not args.no_semantic_verify:
@@ -621,6 +699,7 @@ def main() -> int:
                     state["goals"][j]["last_result"] = result
                     if not verifier_passed(result):
                         regression_idx = earliest_failed_index(result, goals, j)
+                        state["goals"][regression_idx]["last_result"] = result
                         break
                     state["goals"][j]["last_verified_at"] = dt.datetime.now().isoformat()
                     save_state(state_file, state)
@@ -646,7 +725,7 @@ def main() -> int:
 
             run_id = f"round-{rounds:03d}-execute-G{first_pending:02d}-attempt-{current['attempts']}-{now_stamp()}"
             run_dir = args.state_dir / "runs" / run_id
-            prompt = build_execute_prompt(goal_file, goals, first_pending, args.workspace)
+            prompt = build_execute_prompt(goal_file, goals, first_pending, args.workspace, current.get("last_result"))
             result = run_codex_for_prompt(args, prompt, run_dir, f"execute-G{first_pending:02d}", sandbox=args.sandbox)
             current["last_result"] = result
             save_state(state_file, state)
@@ -656,12 +735,15 @@ def main() -> int:
                 print_step(f"Codex execution did not pass. Returning to {state['goals'][failed_idx]['name']}.")
                 mark_from_pending(state, failed_idx)
                 state["goals"][failed_idx]["status"] = STATUS_FAILED
+                state["goals"][failed_idx]["last_result"] = result
                 save_state(state_file, state)
                 continue
 
-            if not run_validation(goal_file, args, run_dir, f"postexecute-G{first_pending:02d}"):
+            validation_ok, validation_failure = run_validation(goal_file, args, run_dir, f"postexecute-G{first_pending:02d}")
+            if not validation_ok:
                 print_step(f"Post-execution validation failed for {current['name']}; retrying same goal later.")
                 current["status"] = STATUS_FAILED
+                current["last_result"] = validation_failure
                 save_state(state_file, state)
                 continue
 
@@ -674,6 +756,7 @@ def main() -> int:
                     print_step(f"Semantic verification failed. Returning to {state['goals'][failed_idx]['name']}.")
                     mark_from_pending(state, failed_idx)
                     state["goals"][failed_idx]["status"] = STATUS_FAILED
+                    state["goals"][failed_idx]["last_result"] = verify_result
                     save_state(state_file, state)
                     continue
 
