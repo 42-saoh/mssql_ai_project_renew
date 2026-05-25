@@ -5,6 +5,7 @@ baseUrlEnv: PLF_METADATA_GATEWAY_URL
 defaultLocalBaseUrl: http://localhost:8100
 readOnly: true
 runtimeDiscoveryOnly: true
+unknownToolsBlockedByPlatform: true
 
 description: >
   PLF DB Agent V2 does not implement or package the MSSQL MCP service.
@@ -38,6 +39,28 @@ metadataSearchMapping:
     q: query
     dbProfileId: dbProfileId
     limit: limit
+  limits:
+    min: 1
+    max: 100
+
+allowedMetadataToolNames:
+  - search_metadata_objects
+  - describe_object
+  - find_references
+  - get_table_schema
+  - get_table_columns
+  - get_table_indexes
+  - get_table_relationships
+  - get_object_dependencies
+  - get_procedure_metadata
+  - get_procedure_definition
+  - get_procedure_dependencies
+
+catalogPolicy:
+  requireReadOnlyFlag: true
+  filterBlockedToolsBeforeReturningToPlatform: true
+  filterUnknownToolsBeforeReturningToPlatform: true
+  invokeUnknownToolsAllowed: false
 
 blockedBeforeProxy:
   exactToolNames:
@@ -47,21 +70,57 @@ blockedBeforeProxy:
     - apply_ddl
     - apply_dml
     - deploy_source
+    - create_object
+    - alter_object
+    - drop_object
+    - truncate_table
+    - insert_row
+    - update_row
+    - delete_row
+    - merge_rows
+    - backup_database
+    - restore_database
+    - grant_permission
+    - revoke_permission
   namePrefixes:
     - execute_
     - apply_
     - deploy_
+    - create_
+    - alter_
+    - drop_
+    - truncate_
+    - insert_
+    - update_
+    - delete_
+    - merge_
+    - backup_
+    - restore_
+    - grant_
+    - revoke_
   nameFragments:
     - row_data
     - free_sql
     - ddl_apply
     - dml_apply
+    - procedure_execution
+    - source_apply
   argumentPolicy:
     - no raw prompt
     - no raw provider response
     - no raw stored procedure definition
     - no row data
     - no secrets
+    - no free SQL execution
+    - no DDL/DML apply
+
+responsePolicy:
+  failClosedOnUnsafeResponse: true
+  successEnvelopeRequiresRequestedToolName: true
+  safeDiagnosticsOnly: true
+  noRowData: true
+  noSecrets: true
+  noRawPromptOrProviderPayloads: true
 
 responseEnvelope:
   success:

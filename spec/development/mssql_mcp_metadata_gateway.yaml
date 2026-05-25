@@ -1,0 +1,110 @@
+version: 0.1.0
+service: mssqlMcpMetadataGateway
+scope: g06-mssql-mcp-metadata-gateway
+
+objective: Implement read-only metadata tools and blocked operation policy.
+
+externalBoundary:
+  implementation: external-standalone-mssql-mcp
+  packagedInThisRepo: false
+  baseUrlEnv: PLF_METADATA_GATEWAY_URL
+  defaultLocalBaseUrl: http://localhost:8100
+  clientModule: apps/api/api_app/services/mssql_mcp_client.py
+  serviceModule: apps/api/api_app/services/metadata_service.py
+  routeModule: apps/api/api_app/routes/metadata.py
+  toolCatalogContract: spec/mcp/mssql_metadata_tool_catalog.yaml
+  openapiContract: spec/openapi/plf_db_agent_v2_openapi.yaml
+
+platformRoutes:
+  readiness: /api/v1/metadata/ready
+  toolCatalog: /api/v1/metadata/tools
+  dbProfiles: /api/v1/metadata/db-profiles
+  toolInvoke: /api/v1/metadata/tools/{toolName}/invoke
+  metadataSearch: /api/v1/metadata/search
+
+allowedMetadataTools:
+  readOnlyOnly: true
+  unknownToolsBlocked: true
+  toolCatalogFiltersBlockedTools: true
+  requiredReadOnlyFlagFromExternalCatalog: true
+  names:
+    - search_metadata_objects
+    - describe_object
+    - find_references
+    - get_table_schema
+    - get_table_columns
+    - get_table_indexes
+    - get_table_relationships
+    - get_object_dependencies
+    - get_procedure_metadata
+    - get_procedure_definition
+    - get_procedure_dependencies
+
+blockedBeforeProxy:
+  rowData: true
+  storedProcedureExecution: true
+  freeSqlExecution: true
+  ddlDmlApply: true
+  sourceApply: true
+  deploy: true
+  rawPrompt: true
+  rawProviderResponse: true
+  rawStoredProcedureDefinition: true
+  secrets: true
+  blockedToolNames:
+    - execute_sql
+    - execute_procedure
+    - query_row_data
+    - apply_ddl
+    - apply_dml
+    - deploy_source
+  blockedToolPrefixes:
+    - execute_
+    - apply_
+    - deploy_
+    - create_
+    - alter_
+    - drop_
+    - truncate_
+    - insert_
+    - update_
+    - delete_
+    - merge_
+    - backup_
+    - restore_
+    - grant_
+    - revoke_
+
+responsePolicy:
+  failClosedOnUnsafeResponse: true
+  successEnvelopeRequiresRequestedToolName: true
+  safeErrorEnvelopeOnly: true
+  responseMayNotExposeRowData: true
+  responseMayNotExposeSecrets: true
+  responseMayNotExposeRawPromptOrProviderPayloads: true
+
+metadataSearch:
+  externalToolName: search_metadata_objects
+  minLimit: 1
+  maxLimit: 100
+  emptyQueryBlocked: true
+  unsafeQueryBlockedBeforeProxy: true
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g06_mssql_mcp_metadata_gateway.py
+    - tests/unit/api/test_mssql_mcp_client.py
+    - tests/unit/api/test_g06_mssql_mcp_client_policy.py
+    - tests/integration/test_metadata_routes.py
+    - tests/integration/test_g06_metadata_gateway_routes.py
+    - tests/security/test_forbidden_operations.py
+    - tests/security/test_g06_mssql_mcp_policy.py
+    - tests/eval/test_g06_mssql_mcp_readonly_eval.py
+
+evalCases:
+  v2_mssql_mcp_readonly:
+    - g06_metadata_gateway_filters_runtime_catalog_to_readonly_allowlist
+    - g06_blocked_mcp_tools_and_unsafe_payloads_do_not_reach_transport
+    - g06_unsafe_mcp_responses_fail_closed
+  v2_blocked_request_paths:
+    - g06_blocked_metadata_gateway_requests_do_not_proxy

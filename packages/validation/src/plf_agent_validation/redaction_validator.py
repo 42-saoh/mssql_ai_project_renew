@@ -7,7 +7,7 @@ _PATTERNS = {
     "RAW_PROMPT": re.compile(r"raw[_ -]?prompt", re.I),
     "RAW_PROVIDER_RESPONSE": re.compile(r"raw[_ -]?provider|provider[_ -]?response", re.I),
     "ROW_DATA": re.compile(r"\b(row data|select \* from|actual rows)\b", re.I),
-    "SECRET": re.compile(r"\b(password|secret|api[_-]?key|token)\s*[:=]", re.I),
+    "SECRET": re.compile(r'\b"?(password|secret|api[_-]?key|token)"?\s*[:=]', re.I),
     "RAW_SP": re.compile(r"\bcreate\s+(or\s+alter\s+)?proc(edure)?\b", re.I),
 }
 
