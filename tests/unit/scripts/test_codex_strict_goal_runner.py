@@ -183,6 +183,8 @@ def test_auto_commit_git_add_excludes_runner_state_dir(tmp_path):
 
     assert runner.build_git_add_command(args) == [
         "git",
+        "-c",
+        f"safe.directory={tmp_path.resolve().as_posix()}",
         "add",
         "-A",
         "--",
@@ -218,33 +220,46 @@ def test_execute_prompt_includes_last_failed_retry_context(tmp_path):
     assert "Outer validation gates run only at stage boundaries G02, G07, G10, and G12" in prompt
 
 
-def test_execute_prompt_requires_concrete_repair_for_previous_stage_regression(tmp_path):
+def test_execute_prompt_requires_concrete_repair_for_stage_gate_rollback(tmp_path):
     workspace = tmp_path
     goals = [workspace / "goals" / f"G{i:02d}-goal.md" for i in range(8)]
     retry_result = {
         "status": "fail",
-        "earliest_failed_goal": "goals/G00-goal.md",
-        "summary": "Foundation contract regressed during MVP gate.",
+        "earliest_failed_goal": "goals/G05-goal.md",
+        "summary": "MVP contract failed during G07 gate.",
         "changed_files": [],
         "validation": "semantic verifier failed",
-        "blockers": ["G00 no longer blocks procedure execution"],
+        "blockers": ["G05 does not hard-block free SQL"],
         "remaining_risks": [],
         "confidence": 1,
     }
-    runner.annotate_previous_stage_regression(retry_result, goals, 7, 0, "MVP Complete")
+    runner.annotate_stage_gate_repair_required(retry_result, goals, 7, 5, "MVP Complete")
 
-    prompt = runner.build_execute_prompt(goals[0], goals, 0, workspace, retry_result)
+    prompt = runner.build_execute_prompt(goals[5], goals, 5, workspace, retry_result)
 
     assert "requires_concrete_repair: true" in prompt
-    assert "completed previous stage regressed" in prompt
+    assert "stage gate rolled back" in prompt
+    assert "git detects matching concrete repository changes" in prompt
     assert "changed_files must include" in prompt
+
+
+def test_stage_gate_rollback_marks_same_stage_goal_for_concrete_repair(tmp_path):
+    goals = [tmp_path / "goals" / f"G{i:02d}-goal.md" for i in range(8)]
+    result = {"status": "fail", "earliest_failed_goal": "goals/G06-goal.md"}
+
+    annotated = runner.annotate_stage_gate_repair_required(result, goals, 7, 6, "MVP Complete")
+
+    assert annotated["_requires_concrete_repair"] is True
+    assert annotated["_repair_gate"] == "MVP Complete"
+    assert annotated["_repair_boundary_goal"] == "G07-goal.md"
+    assert annotated["_repair_failed_goal"] == "G06-goal.md"
 
 
 def test_concrete_repair_failure_result_rejects_empty_changed_files(tmp_path):
     goal_file = tmp_path / "goals" / "G00-goal.md"
     retry_result = {
         "_requires_concrete_repair": True,
-        "_regressed_from_stage": "MVP Complete",
+        "_repair_gate": "MVP Complete",
     }
 
     result = runner.concrete_repair_failure_result(goal_file, tmp_path, retry_result)
@@ -252,6 +267,62 @@ def test_concrete_repair_failure_result_rejects_empty_changed_files(tmp_path):
     assert result["status"] == "fail"
     assert result["_requires_concrete_repair"] is True
     assert "changed_files" in result["blockers"][0]
+
+
+def test_validate_concrete_repair_evidence_requires_git_detected_match(tmp_path):
+    ok, reason = runner.validate_concrete_repair_evidence(
+        {"changed_files": ["packages/example.py"]},
+        [],
+        tmp_path,
+    )
+    assert ok is False
+    assert "none were detected" in reason
+
+    ok, reason = runner.validate_concrete_repair_evidence(
+        {"changed_files": ["README.md"]},
+        ["packages/example.py"],
+        tmp_path,
+    )
+    assert ok is False
+    assert "changed_files to name a concrete" in reason
+
+    ok, reason = runner.validate_concrete_repair_evidence(
+        {"changed_files": ["tests/test_example.py"]},
+        ["packages/example.py"],
+        tmp_path,
+    )
+    assert ok is False
+    assert "did not match" in reason
+
+    ok, reason = runner.validate_concrete_repair_evidence(
+        {"changed_files": ["packages/example.py"]},
+        ["packages/example.py"],
+        tmp_path,
+    )
+    assert ok is True
+    assert reason == ""
+
+
+def test_concrete_repair_changes_ignore_generated_files(tmp_path):
+    before = {
+        "ok": True,
+        "files": {
+            "packages/example.py": "file:old",
+            ".pytest_cache/v/cache/nodeids": "file:old",
+        },
+    }
+    after = {
+        "ok": True,
+        "files": {
+            "packages/example.py": "file:new",
+            ".pytest_cache/v/cache/nodeids": "file:new",
+        },
+    }
+
+    changed, error = runner.concrete_repair_changes_since_snapshot(before, after)
+
+    assert error is None
+    assert changed == ["packages/example.py"]
 
 
 def test_run_validation_returns_failure_context_when_commands_are_missing(tmp_path):

@@ -79,6 +79,7 @@ Goal validation currently calls `make test`, so Windows environments also need a
 - Release Complete: G11 through G12
 
 At each boundary the runner deduplicates identical validation commands across completed goals before running them.
+If boundary validation or semantic verification rolls back to an earlier goal, the next retry must produce concrete git-detected changes in implementation, tests, specs, scripts, database schema, or root goal documents. Self-reported `changed_files` alone is not enough; the runner rejects no-op rollback retries.
 
 ## PGPT configuration
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -42,6 +43,26 @@ STAGE_DEFINITIONS: List[Tuple[str, int, int]] = [
     ("Feature Complete", 8, 10),
     ("Release Complete", 11, 12),
 ]
+
+GENERATED_CHANGE_PREFIXES = (
+    ".codex-goals/",
+    ".git/",
+    ".mypy_cache/",
+    ".pytest_cache/",
+    ".ruff_cache/",
+    ".venv/",
+    "venv/",
+)
+CONCRETE_REPAIR_PREFIXES = (
+    "apps/",
+    "db/",
+    "goals/",
+    "packages/",
+    "scripts/",
+    "services/",
+    "spec/",
+    "tests/",
+)
 
 
 RESULT_SCHEMA: Dict[str, Any] = {
@@ -88,6 +109,10 @@ def format_command_for_log(cmd: List[str]) -> str:
     if is_windows():
         return subprocess.list2cmdline(cmd)
     return " ".join(shlex.quote(c) for c in cmd)
+
+
+def build_git_command(workspace: Path, args: List[str]) -> List[str]:
+    return ["git", "-c", f"safe.directory={workspace.resolve().as_posix()}", *args]
 
 
 def run_command(
@@ -175,7 +200,7 @@ def ensure_codex(explicit: Optional[str]) -> str:
 def ensure_git_repo(workspace: Path, skip: bool) -> None:
     if skip:
         return
-    code, _, _ = run_command(["git", "rev-parse", "--is-inside-work-tree"], cwd=workspace)
+    code, _, _ = run_command(build_git_command(workspace, ["rev-parse", "--is-inside-work-tree"]), cwd=workspace)
     if code != 0:
         raise SystemExit(
             "This runner should be used inside a Git repository. "
@@ -635,9 +660,12 @@ def format_retry_context(result: Optional[Dict[str, Any]]) -> str:
         f"- earliest_failed_goal: {result.get('earliest_failed_goal')}",
     ]
     if result.get("_requires_concrete_repair"):
+        repair_gate = result.get("_repair_gate") or result.get("_regressed_from_stage") or "a stage gate"
+        repair_failed_goal = result.get("_repair_failed_goal") or result.get("earliest_failed_goal")
         lines.append(
-            "- requires_concrete_repair: true; returning pass requires concrete changed_files "
-            "or a strengthened goal/spec/test contract"
+            f"- requires_concrete_repair: true; {repair_gate} rolled back to {repair_failed_goal}; "
+            "returning pass requires actual git-detected changes in implementation, tests, specs, "
+            "scripts, database schema, or root goal documents"
         )
     summary = str(result.get("summary", "")).strip()
     if summary:
@@ -706,7 +734,7 @@ Hard rules:
 11. If retry context is not "- none", address those blockers explicitly before returning "pass"; if a blocker is not valid, explain why in summary and validation.
 12. Regression repair may include implementation, tests, specs, and root development goal documents up to and including {current_rel}. You may strengthen the current goal file or previous goal files when the retry context exposes missing acceptance criteria, missing validation commands, vague deliverables, or missing regression coverage.
 13. Do not edit later goal files. Do not weaken or delete any Objective, Non-goal, Constraint, Acceptance criterion, Validation command, Stop condition, safety policy, or realm boundary. Goal-document changes must make the contract stricter, clearer, or more verifiable.
-14. If retry context says requires_concrete_repair because a completed previous stage regressed, "pass" requires changed_files to name at least one implementation, test, spec, or goal-document contract change that directly repairs or captures that regression.
+14. If retry context says requires_concrete_repair because a stage gate rolled back to this goal, "pass" requires changed_files to name at least one implementation, test, spec, script, database-schema, or goal-document contract change that directly repairs or captures that rollback. The outer runner will reject self-reported changed_files unless git detects matching concrete repository changes from this execution.
 
 Definition of pass:
 - The current goal's acceptance criteria are satisfied.
@@ -825,6 +853,26 @@ def earliest_failed_index(result: Dict[str, Any], goals: List[Path], default: in
     return default
 
 
+def annotate_stage_gate_repair_required(
+    result: Dict[str, Any],
+    goals: List[Path],
+    boundary_idx: int,
+    failed_idx: int,
+    stage_name: str,
+) -> Dict[str, Any]:
+    if failed_idx <= boundary_idx:
+        result["_requires_concrete_repair"] = True
+        result["_repair_gate"] = stage_name
+        result["_repair_boundary_goal"] = goals[boundary_idx].name
+        result["_repair_failed_goal"] = goals[failed_idx].name
+
+    boundary_stage = stage_ordinal_for_goal_index(goals, boundary_idx)
+    failed_stage = stage_ordinal_for_goal_index(goals, failed_idx)
+    if boundary_stage is not None and failed_stage is not None and failed_stage < boundary_stage:
+        result["_regressed_from_stage"] = stage_name
+    return result
+
+
 def annotate_previous_stage_regression(
     result: Dict[str, Any],
     goals: List[Path],
@@ -832,12 +880,7 @@ def annotate_previous_stage_regression(
     failed_idx: int,
     stage_name: str,
 ) -> Dict[str, Any]:
-    boundary_stage = stage_ordinal_for_goal_index(goals, boundary_idx)
-    failed_stage = stage_ordinal_for_goal_index(goals, failed_idx)
-    if boundary_stage is not None and failed_stage is not None and failed_stage < boundary_stage:
-        result["_requires_concrete_repair"] = True
-        result["_regressed_from_stage"] = stage_name
-    return result
+    return annotate_stage_gate_repair_required(result, goals, boundary_idx, failed_idx, stage_name)
 
 
 def result_has_concrete_changed_files(result: Dict[str, Any]) -> bool:
@@ -848,25 +891,33 @@ def concrete_repair_failure_result(
     goal_file: Path,
     workspace: Path,
     retry_result: Dict[str, Any],
+    reason: Optional[str] = None,
+    actual_changed_files: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     current_rel = goal_relative(goal_file, workspace)
-    regression_stage = retry_result.get("_regressed_from_stage", "a later stage gate")
-    reason = (
-        "Previous-stage regression repair requires changed_files to include at least one "
-        "implementation, test, spec, or goal-document contract change."
+    regression_stage = retry_result.get("_repair_gate") or retry_result.get("_regressed_from_stage", "a later stage gate")
+    reason = reason or (
+        "Stage-gate rollback repair requires changed_files to include at least one "
+        "implementation, test, spec, script, database-schema, or goal-document contract change "
+        "that git confirms was changed during this execution."
     )
+    observed = actual_changed_files or []
+    validation = reason
+    if observed:
+        validation = f"{reason}\n\nGit-observed concrete changes: {', '.join(observed)}"
     return {
         "status": "fail",
         "goal_file": current_rel,
         "earliest_failed_goal": current_rel,
-        "summary": f"Concrete repair evidence is missing after regression from {regression_stage}.",
+        "summary": f"Concrete repair evidence is missing after rollback from {regression_stage}.",
         "changed_files": [],
-        "validation": reason,
+        "validation": validation,
         "blockers": [reason],
         "remaining_risks": ["The regression cannot be marked complete without concrete changed_files evidence."],
         "confidence": 1,
         "_requires_concrete_repair": True,
-        "_regressed_from_stage": regression_stage,
+        "_repair_gate": regression_stage,
+        "_actual_changed_files": observed,
     }
 
 
@@ -877,8 +928,151 @@ def relative_pathspec(path: Path, workspace: Path) -> Optional[str]:
         return None
 
 
+def normalize_repo_path(path: str, workspace: Optional[Path] = None) -> str:
+    raw = str(path).strip().strip('"')
+    if workspace:
+        candidate = Path(raw)
+        if candidate.is_absolute():
+            try:
+                raw = candidate.resolve().relative_to(workspace.resolve()).as_posix()
+            except (OSError, ValueError):
+                pass
+    raw = raw.replace("\\", "/")
+    while raw.startswith("./"):
+        raw = raw[2:]
+    return raw.rstrip("/")
+
+
+def is_generated_change_path(path: str, state_rel: Optional[str] = None) -> bool:
+    normalized = normalize_repo_path(path)
+    if not normalized:
+        return True
+    if state_rel and (normalized == state_rel or normalized.startswith(f"{state_rel}/")):
+        return True
+    if normalized.endswith(".pyc") or normalized.endswith(".pyo"):
+        return True
+    if "/__pycache__/" in f"/{normalized}/":
+        return True
+    return any(normalized == prefix.rstrip("/") or normalized.startswith(prefix) for prefix in GENERATED_CHANGE_PREFIXES)
+
+
+def is_concrete_repair_path(path: str) -> bool:
+    normalized = normalize_repo_path(path)
+    if is_generated_change_path(normalized):
+        return False
+    return any(normalized == prefix.rstrip("/") or normalized.startswith(prefix) for prefix in CONCRETE_REPAIR_PREFIXES)
+
+
+def parse_git_status_paths(raw: str) -> List[str]:
+    paths: List[str] = []
+    parts = raw.split("\0")
+    idx = 0
+    while idx < len(parts):
+        entry = parts[idx]
+        if not entry:
+            idx += 1
+            continue
+        if len(entry) < 4:
+            idx += 1
+            continue
+        status = entry[:2]
+        paths.append(normalize_repo_path(entry[3:]))
+        if "R" in status or "C" in status:
+            idx += 1
+            if idx < len(parts) and parts[idx]:
+                paths.append(normalize_repo_path(parts[idx]))
+        idx += 1
+    return paths
+
+
+def file_fingerprint(workspace: Path, rel_path: str) -> str:
+    path = workspace / Path(rel_path)
+    try:
+        if path.is_file():
+            digest = hashlib.sha256()
+            with path.open("rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            return f"file:{digest.hexdigest()}"
+        if path.exists():
+            stat = path.stat()
+            return f"other:{stat.st_mtime_ns}:{stat.st_size}"
+        return "missing"
+    except OSError as exc:
+        return f"error:{type(exc).__name__}:{exc}"
+
+
+def git_worktree_snapshot(workspace: Path, state_dir: Path) -> Dict[str, Any]:
+    code, stdout, stderr = run_command(
+        build_git_command(workspace, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]),
+        cwd=workspace,
+    )
+    if code != 0:
+        detail = (stderr or stdout or "git status failed").strip()
+        return {"ok": False, "error": detail, "files": {}}
+
+    state_rel = relative_pathspec(state_dir, workspace)
+    files: Dict[str, str] = {}
+    for path in parse_git_status_paths(stdout):
+        normalized = normalize_repo_path(path)
+        if is_generated_change_path(normalized, state_rel):
+            continue
+        files[normalized] = file_fingerprint(workspace, normalized)
+    return {"ok": True, "error": "", "files": files}
+
+
+def concrete_repair_changes_since_snapshot(
+    before: Dict[str, Any],
+    after: Dict[str, Any],
+) -> Tuple[Optional[List[str]], Optional[str]]:
+    if not before.get("ok"):
+        return None, f"Cannot verify concrete repair changes before execution: {before.get('error')}"
+    if not after.get("ok"):
+        return None, f"Cannot verify concrete repair changes after execution: {after.get('error')}"
+
+    before_files = before.get("files") or {}
+    after_files = after.get("files") or {}
+    changed = sorted(
+        path
+        for path in set(before_files) | set(after_files)
+        if before_files.get(path) != after_files.get(path) and is_concrete_repair_path(path)
+    )
+    return changed, None
+
+
+def normalized_changed_files(paths: List[str], workspace: Path) -> List[str]:
+    return [normalize_repo_path(path, workspace) for path in paths if str(path).strip()]
+
+
+def validate_concrete_repair_evidence(
+    result: Dict[str, Any],
+    actual_changed_files: List[str],
+    workspace: Path,
+) -> Tuple[bool, str]:
+    actual = set(normalized_changed_files(actual_changed_files, workspace))
+    reported = set(normalized_changed_files(result.get("changed_files") or [], workspace))
+    reported_concrete = {path for path in reported if is_concrete_repair_path(path)}
+
+    if not actual:
+        return False, (
+            "Stage-gate rollback repair requires actual git-detected changes in implementation, "
+            "tests, specs, scripts, database schema, or root goal documents; none were detected."
+        )
+    if not reported_concrete:
+        return False, (
+            "Stage-gate rollback repair requires the Codex result changed_files to name a concrete "
+            "implementation, test, spec, script, database-schema, or goal-document file."
+        )
+    if not (reported_concrete & actual):
+        return False, (
+            "Codex result changed_files did not match the concrete files git detected for this execution. "
+            f"reported={sorted(reported_concrete)} actual={sorted(actual)}"
+        )
+    return True, ""
+
+
 def build_git_add_command(args: argparse.Namespace) -> List[str]:
-    cmd = ["git", "add", "-A", "--", "."]
+    cmd = build_git_command(args.workspace, ["add", "-A", "--", "."])
     state_rel = relative_pathspec(args.state_dir, args.workspace)
     if state_rel:
         cmd.append(f":(exclude){state_rel}/")
@@ -891,7 +1085,11 @@ def auto_commit_if_requested(args: argparse.Namespace, goal_file: Path, run_dir:
     message = f"codex-goal: complete {goal_file.stem}"
     print_step(f"Auto-committing checkpoint: {message}")
     run_command(build_git_add_command(args), cwd=args.workspace, log_path=run_dir / "git-add.log")
-    code, _, _ = run_command(["git", "commit", "-m", message], cwd=args.workspace, log_path=run_dir / "git-commit.log")
+    code, _, _ = run_command(
+        build_git_command(args.workspace, ["commit", "-m", message]),
+        cwd=args.workspace,
+        log_path=run_dir / "git-commit.log",
+    )
     if code != 0:
         print_step("Auto-commit skipped or failed; see git-commit.log")
 
@@ -992,15 +1190,42 @@ def main() -> int:
             run_id = f"round-{rounds:03d}-execute-G{first_pending:02d}-attempt-{current['attempts']}-{now_stamp()}"
             run_dir = args.state_dir / "runs" / run_id
             retry_result = current.get("last_result")
+            requires_concrete_repair = bool(retry_result and retry_result.get("_requires_concrete_repair"))
+            repair_snapshot_before = (
+                git_worktree_snapshot(args.workspace, args.state_dir)
+                if requires_concrete_repair
+                else None
+            )
             prompt = build_execute_prompt(goal_file, goals, first_pending, args.workspace, retry_result)
             result = run_codex_for_prompt(args, prompt, run_dir, f"execute-G{first_pending:02d}", sandbox=args.sandbox)
-            if (
-                retry_result
-                and retry_result.get("_requires_concrete_repair")
-                and verifier_passed(result)
-                and not result_has_concrete_changed_files(result)
-            ):
-                result = concrete_repair_failure_result(goal_file, args.workspace, retry_result)
+            if requires_concrete_repair and verifier_passed(result):
+                repair_snapshot_after = git_worktree_snapshot(args.workspace, args.state_dir)
+                actual_changed_files, snapshot_error = concrete_repair_changes_since_snapshot(
+                    repair_snapshot_before or {},
+                    repair_snapshot_after,
+                )
+                if snapshot_error:
+                    result = concrete_repair_failure_result(
+                        goal_file,
+                        args.workspace,
+                        retry_result or {},
+                        reason=snapshot_error,
+                    )
+                else:
+                    result["_actual_changed_files"] = actual_changed_files or []
+                    evidence_ok, evidence_error = validate_concrete_repair_evidence(
+                        result,
+                        actual_changed_files or [],
+                        args.workspace,
+                    )
+                    if not evidence_ok:
+                        result = concrete_repair_failure_result(
+                            goal_file,
+                            args.workspace,
+                            retry_result or {},
+                            reason=evidence_error,
+                            actual_changed_files=actual_changed_files or [],
+                        )
             current["last_result"] = result
             save_state(state_file, state)
 
@@ -1027,7 +1252,7 @@ def main() -> int:
                 )
                 if not validation_ok:
                     failed_idx = earliest_failed_index(validation_failure or {}, goals, first_pending)
-                    validation_failure = annotate_previous_stage_regression(
+                    validation_failure = annotate_stage_gate_repair_required(
                         validation_failure or {},
                         goals,
                         first_pending,
@@ -1055,7 +1280,7 @@ def main() -> int:
                     current["last_result"] = verify_result
                     if not verifier_passed(verify_result):
                         failed_idx = earliest_failed_index(verify_result, goals, first_pending)
-                        verify_result = annotate_previous_stage_regression(
+                        verify_result = annotate_stage_gate_repair_required(
                             verify_result,
                             goals,
                             first_pending,
