@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 RUNTIME_MARKER = "Service Codex Runner Realm"
+CANONICAL_RUNTIME_TEMPLATE = Path(__file__).resolve().parents[1] / "runtime-template"
 RUNTIME_REQUIRED_PATHS = (
     "AGENTS.md",
     "POLICY.md",
@@ -69,6 +70,11 @@ def assert_runtime_workspace(workspace: str | Path) -> Path:
 
 def _resolve_runtime_template(runtime_template: str | Path) -> Path:
     template = Path(runtime_template).resolve()
+    canonical_template = CANONICAL_RUNTIME_TEMPLATE.resolve()
+    if template != canonical_template:
+        raise WorkspaceContractError(
+            "Runtime template must be services/codex-runner/runtime-template"
+        )
     if not template.is_dir():
         raise WorkspaceContractError(f"Runtime template does not exist: {template}")
 

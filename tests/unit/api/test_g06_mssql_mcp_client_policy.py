@@ -78,6 +78,22 @@ def test_allowed_metadata_tool_names_are_not_classified_as_blocked(tool_name):
         ({"dbProfileId": "master", "query": "select name from dbo.Customer"}, "ROW_DATA"),
         ({"dbProfileId": "master", "query": "drop table dbo.X"}, "DDL_DML_APPLY"),
         ({"dbProfileId": "master", "query": "execute dbo.ProcessOrder"}, "SQL_EXECUTION"),
+        (
+            {"dbProfileId": "master", "query": "run stored procedure dbo.ProcessOrder"},
+            "STORED_PROCEDURE_EXECUTION_BLOCKED",
+        ),
+        (
+            {"dbProfileId": "master", "query": "call procedure dbo.ProcessOrder"},
+            "STORED_PROCEDURE_EXECUTION_BLOCKED",
+        ),
+        (
+            {"dbProfileId": "master", "query": "프로시저를 실행해줘"},
+            "STORED_PROCEDURE_EXECUTION_BLOCKED",
+        ),
+        (
+            {"dbProfileId": "master", "query": "저장 프로시저를 호출해줘"},
+            "STORED_PROCEDURE_EXECUTION_BLOCKED",
+        ),
         ({"dbProfileId": "master", "rawPrompt": "hello"}, "RAW_PROMPT"),
         ({"dbProfileId": "master", "password": "secret"}, "SECRET"),
         ({"dbProfileId": "master", "procedureDefinition": "AS BEGIN SELECT 1 END"}, "RAW_SP"),

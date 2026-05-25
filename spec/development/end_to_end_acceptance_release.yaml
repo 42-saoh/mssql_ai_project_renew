@@ -1,0 +1,82 @@
+version: 0.1.0
+service: endToEndAcceptanceRelease
+scope: g12-end-to-end-acceptance-release
+
+objective: Run final local acceptance scenarios and publish V2 release reports without weakening prior goal policy boundaries.
+
+releaseReports:
+  acceptanceReport: docs/release/v2-acceptance-report.md
+  securityReport: docs/release/v2-security-report.md
+  evalReport: docs/release/v2-eval-report.md
+  runbook: docs/release/v2-runbook.md
+  knownLimitations: docs/release/v2-known-limitations.md
+  implementationPlan: docs/release/v2-implementation-plan.md
+
+policyBoundaries:
+  streamlitCallsFastApiOnly: true
+  serviceRunnerReturnsProposalsOnly: true
+  validationGateControlsArtifactPersistence: true
+  rowDataAllowed: false
+  storedProcedureExecutionAllowed: false
+  freeSqlExecutionAllowed: false
+  ddlDmlApplyAllowed: false
+  sourceApplyAllowed: false
+  deployAllowed: false
+  rawPromptPersistenceAllowed: false
+  rawProviderResponsePersistenceAllowed: false
+  rawStoredProcedureDefinitionPersistenceAllowed: false
+  secretPersistenceAllowed: false
+  rootDevelopmentSkillsAllowedAtRuntime: false
+
+finalAcceptanceScenarios:
+  - id: g12_codex_runner_proposal_to_validated_artifact_review_flow
+    summary: Runner-backed chat creates proposal-only codex run metadata, then a validated proposal can be persisted only as draft/manual-review artifact metadata.
+    expectedBoundary: No runner proposal content is persisted before validation; persisted artifact records store content reference and hash only.
+    evidenceTest: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_metadata_search_returns_safe_metadata_without_side_effects
+    summary: Metadata-search chat calls the Metadata Gateway service and does not submit runner runs, create approvals, or persist artifacts.
+    expectedBoundary: External metadata response payload is returned to the API caller but not persisted in platform stores.
+    evidenceTest: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_history_lookup_returns_sanitized_summaries
+    summary: History lookup returns sanitized prior run summaries for the conversation.
+    expectedBoundary: Raw user messages, raw prompts, provider responses, row data, raw stored procedure definitions, and secrets are not returned.
+    evidenceTest: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_approval_resume_is_review_metadata_only
+    summary: DDL/DML apply requests create policy-review metadata only, and resume changes review status without downstream side effects.
+    expectedBoundary: Resume does not execute DB work, submit runner runs, persist artifacts, apply source, or deploy.
+    evidenceTest: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_stored_procedure_execution_is_hard_blocked
+    summary: Stored procedure execution requests hard-block before PGPT, Metadata Gateway, runner submission, approval side effects, or artifact persistence.
+    expectedBoundary: No row data, procedure execution, runner submission, approval, artifact, or validation records are created.
+    evidenceTest: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_release_reports_publish_validation_and_limitations
+    summary: Release reports document acceptance scope, validation commands, security boundaries, eval coverage, runbook steps, and known limitations.
+    expectedBoundary: Reports do not claim production deployment or policy exceptions.
+    evidenceTest: tests/contract/test_g12_end_to_end_acceptance_release.py
+
+validationGates:
+  requiredMakeTargets:
+    - make test-contract
+    - make test-unit
+    - make test-integration
+    - make test-security
+    - make test-eval
+    - make test-e2e
+    - make test
+  focusedG12Command: python -m pytest tests/contract/test_g12_end_to_end_acceptance_release.py tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py tests/eval/test_g12_end_to_end_acceptance_release_eval.py -q
+
+knownLimitations:
+  report: docs/release/v2-known-limitations.md
+  mustDocument:
+    - local greenfield release acceptance only
+    - production deployment not performed
+    - customer MSSQL row-data access remains forbidden
+    - external MSSQL MCP requires approved dev/test endpoint
+    - real Service Codex execution requires isolated runtime workspace validation
+    - browser smoke tests are optional and gated by environment flags
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g12_end_to_end_acceptance_release.py
+    - tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+    - tests/eval/test_g12_end_to_end_acceptance_release_eval.py

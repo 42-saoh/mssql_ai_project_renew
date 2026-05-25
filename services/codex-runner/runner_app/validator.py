@@ -11,6 +11,7 @@ from plf_agent_validation.schema_validator import validate_runner_result_schema
 
 DEFAULT_RUNTIME_SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "runtime-template" / "schemas"
 PROPOSAL_ALLOWED_STATUSES = {"SUCCEEDED", "REVIEW_REQUIRED"}
+FAILED_OR_BLOCKED_STATUSES = {"FAILED", "BLOCKED"}
 
 
 def validate_result(
@@ -33,6 +34,7 @@ def validation_flags(
     schema_blockers.extend(_validate_runtime_output_schema(result, output_schema, schema_root))
     ok, blockers = validate_runtime_result(result)
     status_blockers = _validate_status_artifact_consistency(result)
+    status_blockers.extend(_validate_failed_or_blocked_status(result))
     if status_blockers:
         ok = False
         blockers.extend(status_blockers)
@@ -68,6 +70,13 @@ def mark_validated(
 def _validate_status_artifact_consistency(result: dict[str, Any]) -> list[str]:
     if result.get("artifactProposals") and result.get("status") not in PROPOSAL_ALLOWED_STATUSES:
         return [f"ARTIFACT_PROPOSALS_NOT_ALLOWED_FOR_STATUS:{result.get('status') or 'UNKNOWN'}"]
+    return []
+
+
+def _validate_failed_or_blocked_status(result: dict[str, Any]) -> list[str]:
+    status = str(result.get("status") or "")
+    if status in FAILED_OR_BLOCKED_STATUSES:
+        return [f"RUNNER_OUTPUT_{status}"]
     return []
 
 

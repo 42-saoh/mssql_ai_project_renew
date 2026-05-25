@@ -1,10 +1,12 @@
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
 from runner_app.event_parser import parse_jsonl_events, summarize_event_stream
+from runner_app.main import submit_run
 from runner_app.real_runner import RealRunnerConfig, submit_real_run
 from runner_app.workspace import WorkspaceContractError, cleanup_workspace, create_workspace, write_run_inputs
 
@@ -66,6 +68,14 @@ def _valid_result() -> dict:
 def test_workspace_creation_rejects_development_root_as_runtime_template(tmp_path):
     with pytest.raises(WorkspaceContractError):
         create_workspace(tmp_path, ROOT)
+
+
+def test_workspace_creation_rejects_marker_compliant_noncanonical_runtime_template(tmp_path):
+    alternate_template = tmp_path / "alternate-runtime-template"
+    shutil.copytree(RUNTIME_TEMPLATE, alternate_template)
+
+    with pytest.raises(WorkspaceContractError):
+        create_workspace(tmp_path / "workspaces", alternate_template)
 
 
 def test_workspace_creation_copies_runtime_template_and_writes_inputs(tmp_path):
@@ -165,8 +175,110 @@ def test_submit_real_run_blocks_unsafe_inputs_before_codex_exec(tmp_path):
 
     assert result["status"] == "BLOCKED"
     assert not result["artifactProposals"]
-    assert any("allowDeploy" in blocker for blocker in result["blockers"])
+    assert "RUNNER_POLICY_ALLOWS_BLOCKED_OPERATION:ALLOW_DEPLOY" in result["blockers"]
     assert called is False
+
+
+def test_submit_real_run_sanitizes_unsafe_skill_allowlist_blocker(tmp_path):
+    called = False
+    request = _request()
+    unsafe_skill = "../.agents/v2-codex-runner-design<script>"
+    request["skillAllowlist"] = [unsafe_skill]
+
+    def fake_codex(command, **kwargs):
+        nonlocal called
+        called = True
+        return subprocess.CompletedProcess(command, 0)
+
+    result = submit_real_run(
+        request,
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert "NON_RUNTIME_SKILL_BLOCKED" in result["blockers"]
+    assert unsafe_skill not in serialized
+    assert called is False
+
+
+def test_submit_real_run_sanitizes_output_blocker_values(tmp_path):
+    unsafe_blocker = "UPSTREAM_BLOCKED:<script>alert(1)</script>"
+
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["status"] = "BLOCKED"
+        result["artifactProposals"] = []
+        result["blockers"] = [unsafe_blocker]
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert result["blockers"] == ["RUNNER_BLOCKED", "RUNNER_OUTPUT_BLOCKED"]
+    assert unsafe_blocker not in serialized
+
+
+@pytest.mark.parametrize(
+    ("status", "status_blocker"),
+    [("FAILED", "RUNNER_OUTPUT_FAILED"), ("BLOCKED", "RUNNER_OUTPUT_BLOCKED")],
+)
+def test_submit_real_run_converts_failed_or_blocked_empty_outputs_to_safe_blocked_envelope(
+    tmp_path, status, status_blocker
+):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["status"] = status
+        result["artifactProposals"] = []
+        result["blockers"] = ["MISSING_REVIEW_MARKERS"]
+        result["modelDiagnostic"] = "safe but model-provided diagnostic"
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert result["blockers"] == ["MISSING_REVIEW_MARKERS", status_blocker]
+    assert "modelDiagnostic" not in result
+    assert result["validation"]["schemaValid"] is True
+    assert result["validation"]["policyValid"] is False
+    assert result["validation"]["staticValidationPassed"] is False
+
+
+def test_submit_run_real_rejects_noncanonical_runtime_template_override(tmp_path):
+    alternate_template = tmp_path / "alternate-runtime-template"
+    shutil.copytree(RUNTIME_TEMPLATE, alternate_template)
+
+    result = submit_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        mode="real",
+        workspace_base=str(tmp_path / "workspaces"),
+        runtime_template=str(alternate_template),
+        run_command=lambda command, **kwargs: subprocess.CompletedProcess(command, 0),
+    )
+
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert result["blockers"] == ["WORKSPACE_CONTRACT_BLOCKED"]
 
 
 def test_submit_real_run_blocks_row_data_evidence_before_codex_exec(tmp_path):

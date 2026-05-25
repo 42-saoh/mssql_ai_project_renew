@@ -35,6 +35,26 @@ def test_metadata_search_route_blocks_unsafe_query_before_proxy():
     assert "drop table" not in str(body).lower()
 
 
+@pytest.mark.parametrize(
+    "query",
+    [
+        "run stored procedure dbo.ProcessOrder",
+        "call procedure dbo.ProcessOrder",
+        "프로시저를 실행해줘",
+        "저장 프로시저를 호출해줘",
+    ],
+)
+def test_metadata_search_route_blocks_stored_procedure_execution_phrases_before_proxy(query):
+    response = TestClient(create_app()).get("/api/v1/metadata/search", params={"q": query})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "MCP_ARGUMENTS_BLOCKED"
+    assert "STORED_PROCEDURE_EXECUTION_BLOCKED" in body["error"]["details"]["violations"]
+    assert query not in str(body)
+
+
 def test_metadata_tools_route_filters_external_catalog(monkeypatch):
     def transport(method, path, payload):
         return {

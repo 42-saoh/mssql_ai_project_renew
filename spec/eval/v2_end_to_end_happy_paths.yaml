@@ -1,6 +1,26 @@
 name: v2_end_to_end_happy_paths
 summary: Supported user flows complete with expected artifacts or metadata responses.
 status: scaffold
+releaseStatus: g12-local-accepted
 cases:
   - id: g02_happy_path_contract_matrix_defined
     summary: End-to-end happy-path evals must cover chat-to-runner, chat-to-metadata, artifact lookup, and blocked request flows once implementation is available.
+    evidence: spec/development/contract_schema_eval_baseline.yaml
+  - id: g12_codex_runner_proposal_to_validated_artifact_review_flow
+    summary: Runner-backed chat records proposal-only codex run metadata, then validation-gated artifact persistence stores draft/manual-review metadata by reference/hash only.
+    evidence: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_metadata_search_returns_safe_metadata_without_side_effects
+    summary: Metadata-search chat returns safe Metadata Gateway response payloads without runner, approval, or artifact side effects.
+    evidence: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_history_lookup_returns_sanitized_summaries
+    summary: History lookup returns sanitized conversation summaries without raw user messages or unsafe payloads.
+    evidence: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_approval_resume_is_review_metadata_only
+    summary: Approval resume updates review metadata only and does not execute DB work, submit runner jobs, persist artifacts, apply source, or deploy.
+    evidence: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_stored_procedure_execution_is_hard_blocked
+    summary: Stored procedure execution requests hard-block before downstream side effects.
+    evidence: tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py
+  - id: g12_release_reports_publish_validation_and_limitations
+    summary: Release reports document acceptance scope, validation commands, security boundaries, eval coverage, runbook steps, and known limitations.
+    evidence: tests/contract/test_g12_end_to_end_acceptance_release.py

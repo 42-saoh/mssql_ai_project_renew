@@ -16,6 +16,8 @@ def test_g07_contract_declares_runner_foundation_boundaries():
     assert contract["service"] == "serviceCodexRunnerFoundation"
     assert contract["scope"] == "g07-service-codex-runner-foundation"
     assert contract["runtimeTemplate"]["path"] == "services/codex-runner/runtime-template"
+    assert contract["runtimeTemplate"]["canonicalOnly"] is True
+    assert contract["runtimeTemplate"]["alternateMarkerCompliantTemplatesAllowed"] is False
     assert contract["runtimeTemplate"]["requiredMarker"] == "Service Codex Runner Realm"
     assert contract["workspace"]["createdBy"] == "services/codex-runner/runner_app/workspace.py"
     assert contract["workspace"]["symlinksAllowed"] is False
@@ -50,6 +52,7 @@ def test_g07_contract_blocks_raw_events_and_runtime_persistence():
     assert contract["eventParsing"]["persistRawStderr"] is False
     assert contract["eventParsing"]["persistRawModelContent"] is False
     assert contract["validation"]["invalidOutputBehavior"].startswith("schema-valid BLOCKED")
+    assert contract["validation"]["blockedEnvelopeBlockersSanitized"] is True
     assert contract["validation"]["proposalStatusesAllowed"] == ["SUCCEEDED", "REVIEW_REQUIRED"]
     assert contract["validation"]["failedOrBlockedOutputBehavior"].startswith("schema-valid BLOCKED")
     assert contract["policyBoundaries"]["runnerReturnsProposalsOnly"] is True

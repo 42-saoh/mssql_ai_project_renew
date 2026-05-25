@@ -8,6 +8,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from plf_agent_orchestration.forbidden_operations import detect_forbidden_operation_blockers
 from plf_agent_validation.redaction_validator import find_redaction_violations
 
 DEFAULT_METADATA_GATEWAY_URL = "http://localhost:8100"
@@ -82,6 +83,9 @@ _MCP_PAYLOAD_BLOCKED_PATTERNS = {
     ),
     "SOURCE_APPLY_OR_DEPLOY": re.compile(r"\b(?:deploy|apply\s+source|overwrite\s+source)\b", re.I),
 }
+_MCP_FORBIDDEN_OPERATION_CODES = {
+    "STORED_PROCEDURE_EXECUTION_BLOCKED",
+}
 _MIN_METADATA_LIMIT = 1
 _MAX_METADATA_LIMIT = 100
 
@@ -144,6 +148,9 @@ def _safe_payload_violations(payload: Any) -> list[str]:
     violations = list(find_redaction_violations(text))
     for code, pattern in _MCP_PAYLOAD_BLOCKED_PATTERNS.items():
         if pattern.search(text) and code not in violations:
+            violations.append(code)
+    for code in detect_forbidden_operation_blockers(text):
+        if code in _MCP_FORBIDDEN_OPERATION_CODES and code not in violations:
             violations.append(code)
     return violations
 

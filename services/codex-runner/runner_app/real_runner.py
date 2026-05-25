@@ -14,10 +14,25 @@ from .codex_exec import CodexExecCommandError, normalize_output_schema, run_code
 from .event_parser import summarize_event_stream
 from .sanitizer import safe_blocked_result, sanitize_result
 from .validator import mark_validated
-from .workspace import WorkspaceContractError, cleanup_workspace, create_workspace, write_run_inputs
+from .workspace import (
+    CANONICAL_RUNTIME_TEMPLATE,
+    WorkspaceContractError,
+    cleanup_workspace,
+    create_workspace,
+    write_run_inputs,
+)
 
-DEFAULT_RUNTIME_TEMPLATE = Path(__file__).resolve().parents[1] / "runtime-template"
+DEFAULT_RUNTIME_TEMPLATE = CANONICAL_RUNTIME_TEMPLATE
 DEFAULT_WORKSPACE_BASE = Path(tempfile.gettempdir()) / "plf_codex_runner_workspaces"
+_POLICY_BLOCKER_DETAILS = {
+    "allowRowData": "ALLOW_ROW_DATA",
+    "allowProcedureExecution": "ALLOW_PROCEDURE_EXECUTION",
+    "allowDdlDmlApply": "ALLOW_DDL_DML_APPLY",
+    "allowSourceApply": "ALLOW_SOURCE_APPLY",
+    "allowDeploy": "ALLOW_DEPLOY",
+    "allowRawPromptStorage": "ALLOW_RAW_PROMPT_STORAGE",
+    "allowRawProviderResponseStorage": "ALLOW_RAW_PROVIDER_RESPONSE_STORAGE",
+}
 
 
 @dataclass(frozen=True)
@@ -100,7 +115,7 @@ def submit_real_run(
         if blockers:
             return safe_blocked_result(
                 request,
-                blockers,
+                list(validated.get("blockers") or blockers),
                 validation=validated["validation"],
                 runtime=runtime,
             )
@@ -141,10 +156,12 @@ def _input_blockers(
     policy = request.get("policy") if isinstance(request.get("policy"), dict) else {}
     for key, value in policy.items():
         if key.startswith("allow") and value is not False:
-            blockers.append(f"RUNNER_POLICY_ALLOWS_BLOCKED_OPERATION:{key}")
+            detail = _POLICY_BLOCKER_DETAILS.get(key)
+            blocker = "RUNNER_POLICY_ALLOWS_BLOCKED_OPERATION"
+            blockers.append(f"{blocker}:{detail}" if detail else blocker)
     for skill in request.get("skillAllowlist", []):
         if not str(skill).startswith("runtime-"):
-            blockers.append(f"NON_RUNTIME_SKILL_BLOCKED:{skill}")
+            blockers.append("NON_RUNTIME_SKILL_BLOCKED")
 
     request_for_redaction = {key: value for key, value in request.items() if key != "policy"}
     serialized_parts = [

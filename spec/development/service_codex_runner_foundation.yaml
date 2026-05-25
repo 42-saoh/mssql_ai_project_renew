@@ -4,6 +4,8 @@ scope: g07-service-codex-runner-foundation
 
 runtimeTemplate:
   path: services/codex-runner/runtime-template
+  canonicalOnly: true
+  alternateMarkerCompliantTemplatesAllowed: false
   requiredMarker: Service Codex Runner Realm
   requiredPaths:
     - AGENTS.md
@@ -73,6 +75,7 @@ eventParsing:
 validation:
   validator: services/codex-runner/runner_app/validator.py
   sanitizer: services/codex-runner/runner_app/sanitizer.py
+  blockedEnvelopeBlockersSanitized: true
   outputSchema: spec/codex-runner/service_codex_run_result.schema.json
   invalidOutputBehavior: schema-valid BLOCKED result with no artifactProposals
   proposalStatusesAllowed:

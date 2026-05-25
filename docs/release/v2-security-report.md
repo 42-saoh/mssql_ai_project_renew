@@ -50,3 +50,20 @@ If a redaction finding occurs:
    source apply, or deploy side effect occurred unless that side effect is
    explicitly allowed by the active policy contract.
 4. Run the focused G11 security and eval tests before resuming release work.
+
+## G12 Release Security Position
+
+G12 release acceptance does not add policy exceptions. The final acceptance
+suite must preserve Streamlit calls FastAPI only, Service Codex Runner returns
+proposals only, validation gate controls artifact persistence, no row data, no
+stored procedure execution, no free SQL execution, no DDL/DML apply, no source
+apply, no deploy, no raw prompt persistence, no raw provider response
+persistence, no raw stored procedure definition persistence, and no secret
+persistence.
+
+Security validation for release:
+
+```bash
+python -m pytest tests/contract/test_g12_end_to_end_acceptance_release.py tests/e2e/test_g12_end_to_end_acceptance_release_e2e.py tests/eval/test_g12_end_to_end_acceptance_release_eval.py -q
+make test
+```

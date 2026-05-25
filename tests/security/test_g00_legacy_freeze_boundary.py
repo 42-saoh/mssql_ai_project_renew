@@ -34,3 +34,8 @@ def test_service_runtime_does_not_take_legacy_reference_docs_as_runtime_instruct
             text = path.read_text(encoding="utf-8")
             for forbidden in forbidden_reference_paths:
                 assert forbidden not in text
+
+
+def test_root_env_file_is_not_persisted_as_development_contract():
+    assert not (ROOT / ".env").exists()
+    assert (ROOT / ".env.example").exists()
