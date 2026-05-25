@@ -50,6 +50,8 @@ def test_g07_contract_blocks_raw_events_and_runtime_persistence():
     assert contract["eventParsing"]["persistRawStderr"] is False
     assert contract["eventParsing"]["persistRawModelContent"] is False
     assert contract["validation"]["invalidOutputBehavior"].startswith("schema-valid BLOCKED")
+    assert contract["validation"]["proposalStatusesAllowed"] == ["SUCCEEDED", "REVIEW_REQUIRED"]
+    assert contract["validation"]["failedOrBlockedOutputBehavior"].startswith("schema-valid BLOCKED")
     assert contract["policyBoundaries"]["runnerReturnsProposalsOnly"] is True
     assert contract["policyBoundaries"]["artifactPersistenceAllowedInRunner"] is False
     assert contract["policyBoundaries"]["rootDevelopmentSkillsAllowedAtRuntime"] is False

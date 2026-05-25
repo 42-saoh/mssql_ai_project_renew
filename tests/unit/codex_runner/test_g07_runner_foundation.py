@@ -226,6 +226,31 @@ def test_submit_real_run_blocks_raw_sp_and_connection_string_inputs_before_codex
     assert called is False
 
 
+@pytest.mark.parametrize("status", ["FAILED", "BLOCKED"])
+def test_submit_real_run_strips_proposals_from_failed_or_blocked_outputs(tmp_path, status):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["status"] = status
+        result["blockers"] = [f"UPSTREAM_{status}"]
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert f"ARTIFACT_PROPOSALS_NOT_ALLOWED_FOR_STATUS:{status}" in result["blockers"]
+    assert result["validation"]["schemaValid"] is True
+    assert result["validation"]["policyValid"] is False
+    assert result["validation"]["staticValidationPassed"] is False
+
+
 def test_submit_real_run_returns_safe_blocked_envelope_for_unsafe_output(tmp_path):
     def fake_codex(command, **kwargs):
         workspace = Path(command[command.index("--cd") + 1])

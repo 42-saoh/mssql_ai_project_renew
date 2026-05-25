@@ -75,6 +75,10 @@ validation:
   sanitizer: services/codex-runner/runner_app/sanitizer.py
   outputSchema: spec/codex-runner/service_codex_run_result.schema.json
   invalidOutputBehavior: schema-valid BLOCKED result with no artifactProposals
+  proposalStatusesAllowed:
+    - SUCCEEDED
+    - REVIEW_REQUIRED
+  failedOrBlockedOutputBehavior: schema-valid BLOCKED result with no artifactProposals
   productionReadyAllowed: false
   reviewRequired: true
 
