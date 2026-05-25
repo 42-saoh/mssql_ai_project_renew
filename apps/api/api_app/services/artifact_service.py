@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from apps.api.api_app.repositories import artifact_repository, validation_repository
+from apps.api.api_app.services.observability_service import record_observability_event
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist, content_ref_for_artifact
 from plf_agent_contracts.enums import ArtifactType
 from plf_agent_validation.policy_validator import validate_runtime_result
@@ -86,6 +87,7 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
         response_blockers = _safe_response_blocker_codes_for_validation(blockers)
         persisted_blockers = _safe_persisted_blocker_codes_for_validation(blockers)
         validation_id = f"validation_{uuid4().hex[:12]}"
+        created_at = _now()
         validation_record = {
             "validation_id": validation_id,
             "artifact_id": "",
@@ -94,14 +96,27 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
             "static_valid": False,
             "blocker_codes": persisted_blockers,
             "review_markers": [],
-            "created_at": _now(),
+            "created_at": created_at,
         }
         assert_safe_to_persist(validation_record)
         validation = validation_repository.put(validation_id, validation_record)
+        record_observability_event(
+            "artifact_validation_blocked",
+            subject_type="artifact_validation",
+            subject_id=validation_id,
+            validation_id=validation_id,
+            chat_run_id=chat_run_id,
+            codex_run_id=codex_run_id,
+            status="BLOCKED",
+            validation_status="BLOCKED",
+            blocker_codes=blockers,
+            created_at=created_at,
+        )
         return {"status": "BLOCKED", "blockers": response_blockers, "validation": to_api_validation(validation)}
 
     artifact_id = f"artifact_{uuid4().hex[:12]}"
     content_markdown = str(proposal.get("contentMarkdown", ""))
+    artifact_created_at = _now()
     record = {
         "artifact_id": artifact_id,
         "chat_run_id": chat_run_id,
@@ -114,12 +129,13 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
         "review_required": True,
         "evidence_refs": list(proposal.get("evidenceRefs", [])),
         "review_markers": list(proposal.get("reviewMarkers", [])),
-        "created_at": _now(),
+        "created_at": artifact_created_at,
     }
     assert_safe_to_persist(record)
     artifact = artifact_repository.put(artifact_id, record)
 
     validation_id = f"validation_{uuid4().hex[:12]}"
+    validation_created_at = _now()
     validation_record = {
         "validation_id": validation_id,
         "artifact_id": artifact_id,
@@ -128,10 +144,23 @@ def persist_artifact_after_validation(proposal: dict, *, chat_run_id: str = "man
         "static_valid": True,
         "blocker_codes": [],
         "review_markers": record["review_markers"],
-        "created_at": _now(),
+        "created_at": validation_created_at,
     }
     assert_safe_to_persist(validation_record)
     validation = validation_repository.put(validation_id, validation_record)
+    record_observability_event(
+        "artifact_persisted",
+        subject_type="artifact",
+        subject_id=artifact_id,
+        artifact_id=artifact_id,
+        artifact_type=str(proposal["artifactType"]),
+        validation_id=validation_id,
+        chat_run_id=chat_run_id,
+        codex_run_id=codex_run_id,
+        status="PERSISTED",
+        validation_status="VALIDATED",
+        created_at=validation_created_at,
+    )
     return {
         "status": "PERSISTED",
         "artifact": to_api_artifact(artifact, include_validations=True),
@@ -272,6 +301,7 @@ def _blocked_validation_response(blockers: list[str]) -> dict:
     response_blockers = _safe_response_blocker_codes_for_validation(blockers)
     persisted_blockers = _safe_persisted_blocker_codes_for_validation(blockers)
     validation_id = f"validation_{uuid4().hex[:12]}"
+    created_at = _now()
     validation_record = {
         "validation_id": validation_id,
         "artifact_id": "",
@@ -280,10 +310,20 @@ def _blocked_validation_response(blockers: list[str]) -> dict:
         "static_valid": False,
         "blocker_codes": persisted_blockers,
         "review_markers": [],
-        "created_at": _now(),
+        "created_at": created_at,
     }
     assert_safe_to_persist(validation_record)
     validation = validation_repository.put(validation_id, validation_record)
+    record_observability_event(
+        "artifact_validation_blocked",
+        subject_type="artifact_validation",
+        subject_id=validation_id,
+        validation_id=validation_id,
+        status="BLOCKED",
+        validation_status="BLOCKED",
+        blocker_codes=blockers,
+        created_at=created_at,
+    )
     return {"status": "BLOCKED", "blockers": response_blockers, "validation": to_api_validation(validation)}
 
 

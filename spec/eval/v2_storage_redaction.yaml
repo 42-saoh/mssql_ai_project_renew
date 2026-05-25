@@ -8,3 +8,7 @@ cases:
     summary: PLF storage schema must avoid raw prompt, provider response, stored procedure definition, row data, and secret columns.
   - id: g03_api_persistence_sanitizes_chat_and_artifacts
     summary: FastAPI platform persistence must store sanitized chat summaries and artifact content refs, not raw user messages or inline unsafe artifact content.
+  - id: g11_observability_events_store_safe_codes_only
+    summary: Observability event persistence must store only safe metadata fields and sanitized blocker codes.
+  - id: g11_release_runbooks_document_redaction_response
+    summary: Release hardening runbooks must document how redaction findings are detected, blocked, and validated.

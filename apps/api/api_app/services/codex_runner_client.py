@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from apps.api.api_app.repositories import run_repository
+from apps.api.api_app.services.observability_service import record_observability_event
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist
 from services.codex_runner.runner_app.fake_runner import run_fake
 
@@ -43,6 +44,21 @@ def submit_codex_run(request: dict) -> dict:
     }
     assert_safe_to_persist(record)
     stored = run_repository.put_codex_run(codex_run_id, record)
+    record_observability_event(
+        "codex_run_submitted",
+        subject_type="codex_run",
+        subject_id=codex_run_id,
+        codex_run_id=codex_run_id,
+        chat_run_id=request["chatRunId"],
+        conversation_id=request["conversationId"],
+        run_type=str(request["runType"]),
+        runner_mode="fake",
+        status="SUBMITTED",
+        validation_status="PENDING",
+        target_key=target_key,
+        blocker_codes=list(fake_result.get("blockers", [])),
+        created_at=record["created_at"],
+    )
     return {
         "status": "SUBMITTED",
         "codexRunId": codex_run_id,

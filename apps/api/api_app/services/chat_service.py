@@ -8,6 +8,7 @@ from apps.api.api_app.auth import require_actor_id
 from apps.api.api_app.repositories import approval_repository, conversation_repository, run_repository
 from apps.api.api_app.services import metadata_service
 from apps.api.api_app.services.codex_runner_client import submit_codex_run
+from apps.api.api_app.services.observability_service import record_observability_event
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist, summarize_user_message
 from plf_agent_contracts.codex_runner import ServiceCodexRunRequest, TargetRef
 from plf_agent_orchestration.graph import orchestrate_message
@@ -91,6 +92,20 @@ def create_chat_run(message: str, *, conversation_id: str | None = None, actor_i
     }
     assert_safe_to_persist(run_record)
     run_repository.put_chat_run(chat_run_id, run_record)
+    record_observability_event(
+        "chat_run_recorded",
+        subject_type="chat_run",
+        subject_id=chat_run_id,
+        chat_run_id=chat_run_id,
+        conversation_id=conversation_id,
+        actor_id=actor,
+        intent=str(routed["intent"]),
+        route=str(routed["route"]),
+        status=status,
+        policy_decision=str(routed["policyDecision"]),
+        blocker_codes=run_record["blockers"],
+        created_at=now,
+    )
 
     response: dict[str, object] = {
         "chatRunId": chat_run_id,
@@ -126,6 +141,16 @@ def create_chat_run(message: str, *, conversation_id: str | None = None, actor_i
         }
         assert_safe_to_persist(approval)
         approval_repository.put(approval_id, approval)
+        record_observability_event(
+            "approval_requested",
+            subject_type="approval",
+            subject_id=approval_id,
+            approval_id=approval_id,
+            approval_type="POLICY_REVIEW",
+            chat_run_id=chat_run_id,
+            status="PENDING",
+            created_at=now,
+        )
         response["approvalId"] = approval_id
 
     return response

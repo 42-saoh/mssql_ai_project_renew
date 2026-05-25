@@ -12,3 +12,5 @@ cases:
     summary: FastAPI blocked request handling must not submit Service Codex Runner work or persist artifacts.
   - id: g06_blocked_metadata_gateway_requests_do_not_proxy
     summary: Metadata Gateway blocks unsafe tool names, arguments, and search queries before the external MSSQL MCP transport is called.
+  - id: g11_blocked_requests_emit_safe_observability_without_side_effects
+    summary: Blocked requests may emit sanitized observability events but must not create approvals, runner submissions, artifacts, DB execution, source apply, or deploy side effects.

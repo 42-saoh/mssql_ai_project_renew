@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from apps.api.api_app.repositories import approval_repository
+from apps.api.api_app.services.observability_service import record_observability_event
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist
 
 
@@ -22,9 +23,20 @@ def resume_approval(approval_id: str) -> dict[str, object]:
     if record is None:
         return {"approvalId": approval_id, "status": "NOT_FOUND"}
     record["status"] = "RESUMED"
-    record["resolved_at"] = datetime.now(UTC).isoformat()
+    resolved_at = datetime.now(UTC).isoformat()
+    record["resolved_at"] = resolved_at
     assert_safe_to_persist(record)
     approval_repository.put(approval_id, record)
+    record_observability_event(
+        "approval_resumed",
+        subject_type="approval",
+        subject_id=approval_id,
+        approval_id=approval_id,
+        approval_type=str(record["approval_type"]),
+        chat_run_id=str(record["chat_run_id"]),
+        status="RESUMED",
+        created_at=resolved_at,
+    )
     return {"approvalId": approval_id, "status": "RESUMED"}
 
 

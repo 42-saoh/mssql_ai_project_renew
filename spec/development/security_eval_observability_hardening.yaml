@@ -1,0 +1,132 @@
+version: 0.1.0
+service: securityEvalObservabilityHardening
+scope: g11-security-eval-observability-hardening
+
+objective: Harden policy boundaries, storage redaction, forbidden-operation eval coverage, safe observability, and release runbooks.
+
+securityBoundaries:
+  crossRealm:
+    developmentDocsAllowedAtRuntime: false
+    developmentSkillsAllowedAtRuntime: false
+    runtimeTemplateOnlyWorkspaceSource: services/codex-runner/runtime-template
+  forbiddenOperations:
+    rowDataAllowed: false
+    storedProcedureExecutionAllowed: false
+    freeSqlExecutionAllowed: false
+    ddlDmlApplyAllowed: false
+    sourceApplyAllowed: false
+    deployAllowed: false
+  persistence:
+    rawPromptPersistenceAllowed: false
+    rawProviderResponsePersistenceAllowed: false
+    rawStoredProcedureDefinitionPersistenceAllowed: false
+    rowDataPersistenceAllowed: false
+    secretPersistenceAllowed: false
+    validationGateControlsArtifactPersistence: true
+
+storageRedaction:
+  service: apps/api/api_app/services/persistence_safety.py
+  redactionValidator: packages/validation/src/plf_agent_validation/redaction_validator.py
+  enforcedBeforeRepositories:
+    - conversation_repository
+    - run_repository
+    - artifact_repository
+    - validation_repository
+    - approval_repository
+    - observability_repository
+  unsafeMarkerCodes:
+    - RAW_PROMPT
+    - RAW_PROVIDER_RESPONSE
+    - RAW_SP
+    - ROW_DATA
+    - SECRET
+    - CONNECTION_STRING
+
+observability:
+  langsmithContract: spec/observability/langsmith_development_tracing.yaml
+  safeEventService: apps/api/api_app/services/observability_service.py
+  safeEventRepository: apps/api/api_app/repositories/observability_repository.py
+  persistedEventPayloadsAllowed: true
+  persistedEventPayloadsSanitizedOnly: true
+  allowedEventFields:
+    - event_id
+    - event_type
+    - subject_type
+    - subject_id
+    - actor_id
+    - approval_id
+    - approval_type
+    - artifact_id
+    - artifact_type
+    - blocker_codes
+    - chat_run_id
+    - codex_run_id
+    - conversation_id
+    - intent
+    - policy_decision
+    - route
+    - run_type
+    - runner_mode
+    - status
+    - target_key
+    - validation_id
+    - validation_status
+    - created_at
+  forbiddenEventData:
+    - raw prompt
+    - raw provider response
+    - raw stored procedure definition
+    - row data
+    - secrets
+    - connection strings
+    - source content
+    - runner stdout
+    - runner stderr
+
+releaseRunbooks:
+  securityReport: docs/release/v2-security-report.md
+  evalReport: docs/release/v2-eval-report.md
+  runbook: docs/release/v2-runbook.md
+  mustDocument:
+    - policy boundary summary
+    - storage redaction controls
+    - observability safe-data policy
+    - incident response for redaction findings
+    - validation commands
+
+evalHardening:
+  suites:
+    - v2_cross_realm_boundary
+    - v2_storage_redaction
+    - v2_blocked_request_paths
+    - v2_runner_policy
+    - v2_mssql_mcp_readonly
+    - v2_streamlit_api_only
+  addedCases:
+    v2_storage_redaction:
+      - g11_observability_events_store_safe_codes_only
+      - g11_release_runbooks_document_redaction_response
+    v2_blocked_request_paths:
+      - g11_blocked_requests_emit_safe_observability_without_side_effects
+
+policyBoundaries:
+  streamlitCallsFastApiOnly: true
+  serviceRunnerReturnsProposalsOnly: true
+  validationGateControlsArtifactPersistence: true
+  rowDataAllowed: false
+  storedProcedureExecutionAllowed: false
+  freeSqlExecutionAllowed: false
+  ddlDmlApplyAllowed: false
+  sourceApplyAllowed: false
+  deployAllowed: false
+  rawPromptPersistenceAllowed: false
+  rawProviderResponsePersistenceAllowed: false
+  rawStoredProcedureDefinitionPersistenceAllowed: false
+  secretPersistenceAllowed: false
+  rootDevelopmentSkillsAllowedAtRuntime: false
+
+acceptanceEvidence:
+  focusedTests:
+    - tests/contract/test_g11_security_eval_observability_hardening.py
+    - tests/security/test_g11_observability_storage_hardening.py
+    - tests/eval/test_g11_security_eval_observability_hardening_eval.py
