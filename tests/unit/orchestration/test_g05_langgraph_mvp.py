@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from plf_agent_contracts.enums import Intent
 from plf_agent_orchestration.graph import orchestrate_message
 from plf_agent_orchestration.pgpt_client import PgptClassification, PgptSettings
@@ -72,6 +74,34 @@ def test_hard_policy_gate_blocks_stored_procedure_execution_before_pgpt_or_runne
     assert "STORED_PROCEDURE_EXECUTION_BLOCKED" in result["blockers"]
     assert result["runnerRequest"] is None
     assert result["pgptUsed"] is False
+    assert pgpt.calls == []
+
+
+@pytest.mark.parametrize(
+    ("message", "blocker"),
+    [
+        ("select name from dbo.Customer", "FREE_SQL_EXECUTION_BLOCKED"),
+        ("run query select customer_id from dbo.Customer", "FREE_SQL_EXECUTION_BLOCKED"),
+        ("show customer rows", "ROW_DATA_ACCESS_BLOCKED"),
+        ("show customer records", "ROW_DATA_ACCESS_BLOCKED"),
+        ("show sample data for dbo.Customer", "ROW_DATA_ACCESS_BLOCKED"),
+        ("\uace0\uac1d \ud589 \ub370\uc774\ud130\ub97c \ubcf4\uc5ec\uc918", "ROW_DATA_ACCESS_BLOCKED"),
+        ("\uace0\uac1d \ub808\ucf54\ub4dc\ub97c \uc870\ud68c\ud574\uc918", "ROW_DATA_ACCESS_BLOCKED"),
+        ("SQL \uc2e4\ud589: select name from dbo.Customer", "FREE_SQL_EXECUTION_BLOCKED"),
+    ],
+)
+def test_hard_policy_gate_blocks_free_sql_and_row_data_before_pgpt_or_runner(message, blocker):
+    pgpt = CountingPgpt()
+
+    result = orchestrate_message(message, pgpt_client=pgpt)
+
+    assert result["intent"] == "BLOCKED_OR_APPROVAL_REQUIRED"
+    assert result["policyDecision"] == "BLOCKED"
+    assert result["route"] == "blocked"
+    assert blocker in result["blockers"]
+    assert result["runnerRequest"] is None
+    assert result["pgptUsed"] is False
+    assert result["pgptFallbackReason"] == "POLICY_BLOCKED_BEFORE_PGPT"
     assert pgpt.calls == []
 
 

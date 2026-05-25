@@ -58,6 +58,21 @@ def test_redaction_detects_raw_payloads():
 
 
 @pytest.mark.parametrize(
+    "payload",
+    [
+        "select name from dbo.Customer",
+        '{"data":{"rows":[{"customer":"alice"}]}}',
+        '{"data":{"records":[{"customer":"alice"}]}}',
+        '{"data":{"values":["alice"]}}',
+        '{"resultSet":[{"customer":"alice"}]}',
+        "\uc0d8\ud50c \ub370\uc774\ud130\ub97c \ubcf4\uc5ec\uc918",
+    ],
+)
+def test_redaction_detects_free_sql_and_structured_row_data(payload):
+    assert "ROW_DATA" in find_redaction_violations(payload)
+
+
+@pytest.mark.parametrize(
     "message",
     [
         "exec dbo.ProcessOrder",

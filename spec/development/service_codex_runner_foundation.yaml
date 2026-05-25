@@ -1,0 +1,89 @@
+version: 0.1.0
+service: serviceCodexRunnerFoundation
+scope: g07-service-codex-runner-foundation
+
+runtimeTemplate:
+  path: services/codex-runner/runtime-template
+  requiredMarker: Service Codex Runner Realm
+  requiredPaths:
+    - AGENTS.md
+    - POLICY.md
+    - PROJECT.md
+    - ARCHITECTURE.md
+    - EVAL_SPEC.md
+    - ROLES.md
+    - SKILLS.md
+    - TOOLS.md
+    - .codex/config.toml
+    - .agents/skills
+    - schemas/output.schema.json
+    - schemas/service_codex_run_result.schema.json
+
+workspace:
+  createdBy: services/codex-runner/runner_app/workspace.py
+  idPrefix: codexrun_
+  requiredDirs:
+    - input
+    - outputs
+    - scratch
+  forbiddenCopiedFromRoot:
+    - .env
+    - .env.example
+    - README.md
+    - DESIGN.md
+    - goals
+    - docs/reference
+  symlinksAllowed: false
+
+inputs:
+  requestFile: input/run_request.json
+  evidenceBundleFile: input/evidence_bundle.json
+  optionalToolCatalogFile: input/tool_catalog.json
+  blockedBeforeExec:
+    - raw prompt
+    - raw provider response
+    - row data
+    - raw stored procedure definition
+    - secret
+  requestSchema: spec/codex-runner/service_codex_run_request.schema.json
+
+codexExec:
+  commandBuilder: services/codex-runner/runner_app/codex_exec.py
+  approvalPolicy: never
+  sandboxMode: read-only
+  jsonEvents: true
+  outputLastMessage: outputs/final.json
+  outputSchemaRoot: schemas
+  forbiddenOutputSchemaPaths:
+    - absolute paths
+    - parent traversal
+    - paths outside schemas/
+
+eventParsing:
+  parser: services/codex-runner/runner_app/event_parser.py
+  persistRawStdout: false
+  persistRawStderr: false
+  persistRawModelContent: false
+  allowedSummaryFields:
+    - eventCount
+    - eventTypes
+    - unparsedCount
+    - stderrLineCount
+
+validation:
+  validator: services/codex-runner/runner_app/validator.py
+  sanitizer: services/codex-runner/runner_app/sanitizer.py
+  outputSchema: spec/codex-runner/service_codex_run_result.schema.json
+  invalidOutputBehavior: schema-valid BLOCKED result with no artifactProposals
+  productionReadyAllowed: false
+  reviewRequired: true
+
+policyBoundaries:
+  runnerReturnsProposalsOnly: true
+  artifactPersistenceAllowedInRunner: false
+  rowDataAllowed: false
+  procedureExecutionAllowed: false
+  ddlDmlApplyAllowed: false
+  sourceApplyAllowed: false
+  deployAllowed: false
+  rootDevelopmentSkillsAllowedAtRuntime: false

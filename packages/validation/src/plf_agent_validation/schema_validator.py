@@ -8,6 +8,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+_RUNNER_REQUEST_SCHEMA = "spec/codex-runner/service_codex_run_request.schema.json"
 _RUNNER_RESULT_SCHEMA = "spec/codex-runner/service_codex_run_result.schema.json"
 _ARTIFACT_SCHEMA_BY_TYPE = {
     "SP_ANALYSIS_DOC": "spec/artifacts/sp_analysis_doc.schema.json",
@@ -31,6 +32,10 @@ def validate_required_keys(obj: dict[str, Any], required: list[str]) -> tuple[bo
 
 def validate_runner_result_schema(result: dict[str, Any]) -> list[str]:
     return _validate_schema(result, _RUNNER_RESULT_SCHEMA, "RUNNER_RESULT_SCHEMA_INVALID")
+
+
+def validate_runner_request_schema(request: dict[str, Any]) -> list[str]:
+    return _validate_schema(request, _RUNNER_REQUEST_SCHEMA, "RUNNER_REQUEST_SCHEMA_INVALID")
 
 
 def validate_artifact_proposal_schema(proposal: dict[str, Any]) -> list[str]:

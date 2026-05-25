@@ -32,6 +32,7 @@ def test_g05_contract_preserves_policy_and_checkpoint_boundaries():
     spec = _spec()
     checkpoint = spec["checkpointState"]
     runner = spec["fakeRunnerRouting"]
+    coverage = spec["policyGate"]["classifierCoverage"]
 
     assert spec["domainGuard"]["blocksGeneralChat"] is True
     assert spec["domainGuard"]["pgptMayNotAnswerGeneralChat"] is True
@@ -47,6 +48,18 @@ def test_g05_contract_preserves_policy_and_checkpoint_boundaries():
     assert runner["persistFakeRunnerProposalContent"] is False
     assert runner["persistArtifactProposalsInG05"] is False
     assert runner["productionReadyAllowed"] is False
+    assert {
+        "non_star_select_statement",
+        "run_query_select_statement",
+        "korean_sql_execution_phrase",
+    } <= set(coverage["freeSqlExecution"])
+    assert {
+        "row_keyword_request",
+        "record_keyword_request",
+        "sample_data_request",
+        "structured_row_data_payload",
+        "korean_row_data_phrase",
+    } <= set(coverage["rowDataAccess"])
 
 
 def test_g05_graph_uses_declared_langgraph_nodes():

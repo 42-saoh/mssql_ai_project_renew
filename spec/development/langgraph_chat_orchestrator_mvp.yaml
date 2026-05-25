@@ -44,6 +44,17 @@ policyGate:
     - stored_procedure_execution
     - free_sql_execution
     - source_apply_or_deploy
+  classifierCoverage:
+    freeSqlExecution:
+      - non_star_select_statement
+      - run_query_select_statement
+      - korean_sql_execution_phrase
+    rowDataAccess:
+      - row_keyword_request
+      - record_keyword_request
+      - sample_data_request
+      - structured_row_data_payload
+      - korean_row_data_phrase
   manualReviewOperations:
     - ddl_dml_apply_request
   blockedRequestsDoNotCallPgpt: true

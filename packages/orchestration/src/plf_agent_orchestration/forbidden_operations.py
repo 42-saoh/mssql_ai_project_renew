@@ -12,16 +12,36 @@ class ForbiddenOperationRule:
 
 _IDENTIFIER = r"(?:\[[^\]]+\]|[a-z_][\w$]*|\*)"
 _DOTTED_OBJECT = rf"{_IDENTIFIER}(?:\s*\.\s*{_IDENTIFIER}){{1,2}}"
+_SQL_SELECT_STATEMENT = (
+    r"\bselect\s+(?:top\s*\(?\s*\d+\s*\)?\s+)?(?:distinct\s+)?"
+    r".{1,500}?\s+from\s+"
+    rf"{_IDENTIFIER}(?:\s*\.\s*{_IDENTIFIER}){{0,2}}\b"
+)
 _KO_STORED_PROCEDURE = "(?:\uc800\uc7a5\\s*)?\ud504\ub85c\uc2dc\uc800"
 _KO_OBJECT_PARTICLE = "(?:\\s*(?:\uc744|\ub97c))?"
 _KO_EXECUTE_OR_CALL = "(?:\uc2e4\ud589|\ud638\ucd9c)"
+_KO_ROW_DATA = "\ud589\\s*\ub370\uc774\ud130"
+_KO_ACTUAL_ROWS = "\uc2e4\uc81c\\s*\ud589"
+_KO_RECORD = "\ub808\ucf54\ub4dc"
+_KO_SAMPLE_DATA = "\uc0d8\ud50c\\s*\ub370\uc774\ud130"
+_KO_DATA_ACTION = "(?:\uc870\ud68c|\ubcf4\uc5ec|\ucd9c\ub825|\uac00\uc838|\uc77d\uc5b4)"
+_KO_SQL_OR_QUERY = "(?:sql|\ucffc\ub9ac)"
+_KO_SQL_EXECUTION = "(?:\uc2e4\ud589|\uc218\ud589|\ub3cc\ub824|\uc870\ud68c)"
 
 
 _RULES = (
     ForbiddenOperationRule(
         "ROW_DATA_ACCESS_BLOCKED",
         (
-            re.compile(r"\b(?:row\s+data|actual\s+rows?|select\s+\*)\b", re.I),
+            re.compile(r"\b(?:row\s+data|actual\s+rows?|actual\s+records?|sample\s+data|table\s+data|select\s+\*)\b", re.I),
+            re.compile(
+                r"\b(?:show|display|list|return|get|fetch|view|export)\s+"
+                r"(?:the\s+)?(?:\w+\s+){0,5}(?:rows?|records?|sample\s+data|table\s+data|data)\b",
+                re.I,
+            ),
+            re.compile(r"\b(?:rows?|records?)\s+(?:from|in|for)\s+[\w\[\].]+", re.I),
+            re.compile(f"(?:{_KO_ROW_DATA}|{_KO_ACTUAL_ROWS}|{_KO_RECORD}|{_KO_SAMPLE_DATA})", re.I),
+            re.compile(f"(?<!\uba54\ud0c0)\ub370\uc774\ud130{_KO_OBJECT_PARTICLE}\\s*{_KO_DATA_ACTION}", re.I),
         ),
     ),
     ForbiddenOperationRule(
@@ -39,7 +59,10 @@ _RULES = (
         "FREE_SQL_EXECUTION_BLOCKED",
         (
             re.compile(r"\b(?:execute|run)\s+(?:this\s+)?sql\b", re.I),
+            re.compile(r"\b(?:run|execute|submit|issue)\s+(?:this\s+)?(?:query|select)\b", re.I),
             re.compile(r"\bfree\s+sql\s+(?:execution|execute|run)\b", re.I),
+            re.compile(_SQL_SELECT_STATEMENT, re.I | re.S),
+            re.compile(f"\\b{_KO_SQL_OR_QUERY}\\s*{_KO_SQL_EXECUTION}", re.I),
         ),
     ),
     ForbiddenOperationRule(

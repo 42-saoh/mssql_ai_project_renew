@@ -1,4 +1,6 @@
-from runner_app.codex_exec import build_codex_exec_command
+import pytest
+
+from runner_app.codex_exec import CodexExecCommandError, build_codex_exec_command, normalize_output_schema
 
 
 def test_codex_exec_command_is_bound_to_runtime_workspace_and_readonly():
@@ -24,3 +26,20 @@ def test_codex_exec_command_allows_explicit_runtime_schema_override():
     cmd = build_codex_exec_command("runtime-workspace", "schemas/service_codex_run_result.schema.json")
 
     assert cmd[cmd.index("--output-schema") + 1] == "schemas/service_codex_run_result.schema.json"
+
+
+def test_codex_exec_command_normalizes_bare_runtime_schema_name():
+    assert normalize_output_schema("service_codex_run_result.schema.json") == "schemas/service_codex_run_result.schema.json"
+
+
+@pytest.mark.parametrize(
+    "output_schema",
+    [
+        "../service_codex_run_result.schema.json",
+        "outside/service_codex_run_result.schema.json",
+        "schemas/output.txt",
+    ],
+)
+def test_codex_exec_command_rejects_schema_paths_outside_runtime_schemas(output_schema):
+    with pytest.raises(CodexExecCommandError):
+        normalize_output_schema(output_schema)
