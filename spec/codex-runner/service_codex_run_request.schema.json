@@ -59,7 +59,40 @@
       }
     },
     "policy": {
-      "type": "object"
+      "type": "object",
+      "required": [
+        "allowRowData",
+        "allowProcedureExecution",
+        "allowDdlDmlApply",
+        "allowSourceApply",
+        "allowDeploy",
+        "allowRawPromptStorage",
+        "allowRawProviderResponseStorage"
+      ],
+      "properties": {
+        "allowRowData": {
+          "const": false
+        },
+        "allowProcedureExecution": {
+          "const": false
+        },
+        "allowDdlDmlApply": {
+          "const": false
+        },
+        "allowSourceApply": {
+          "const": false
+        },
+        "allowDeploy": {
+          "const": false
+        },
+        "allowRawPromptStorage": {
+          "const": false
+        },
+        "allowRawProviderResponseStorage": {
+          "const": false
+        }
+      },
+      "additionalProperties": false
     },
     "toolMode": {
       "enum": [

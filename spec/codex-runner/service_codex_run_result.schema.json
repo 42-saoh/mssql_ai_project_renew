@@ -40,7 +40,7 @@
       "const": false
     },
     "reviewRequired": {
-      "type": "boolean"
+      "const": true
     },
     "artifactProposals": {
       "type": "array",

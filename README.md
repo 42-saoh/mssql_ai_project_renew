@@ -47,7 +47,33 @@ python -m pip install -r requirements-dev.txt
 python .\scripts\codex-strict-goal-runner.py --workspace . --goals-dir goals --sandbox workspace-write --approval never --auto-commit
 ```
 
-Goal validation currently calls `make test`, so Windows environments also need a working GNU Make executable on `PATH`.
+If Codex validation runs under a sandbox account that cannot resolve your interactive `python` or `make`, pass explicit validation tool paths. Prefer real executable locations or accessible installation directories over WinGet symlink shims:
+
+```powershell
+$python = (Get-Command python).Source
+$makeCommand = Get-Command make
+$makeItem = Get-Item $makeCommand.Source
+$make = if ($makeItem.Target) { $makeItem.Target[0] } else { $makeCommand.Source }
+python .\scripts\codex-strict-goal-runner.py `
+  --workspace . `
+  --goals-dir goals `
+  --sandbox workspace-write `
+  --approval never `
+  --auto-commit `
+  --validation-python $python `
+  --validation-make $make
+```
+
+The same settings can be supplied with `CODEX_GOAL_RUNNER_PYTHON`, `CODEX_GOAL_RUNNER_MAKE`, and `CODEX_GOAL_RUNNER_PATH_PREPEND`.
+
+Goal validation currently calls `make test`, so Windows environments also need a working GNU Make executable on `PATH`. The strict goal runner executes outer validation at stage boundaries only:
+
+- Foundation Complete: G00 through G02
+- MVP Complete: G03 through G07
+- Feature Complete: G08 through G10
+- Release Complete: G11 through G12
+
+At each boundary the runner deduplicates identical validation commands across completed goals before running them.
 
 ## PGPT configuration
 

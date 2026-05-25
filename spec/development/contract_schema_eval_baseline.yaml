@@ -55,6 +55,14 @@ runnerSchemas:
       - EVIDENCE_BUNDLE_ONLY
       - SCOPED_TOOL_PROXY
     skillNamePattern: "^runtime-"
+    requiredPolicy:
+      allowRowData: false
+      allowProcedureExecution: false
+      allowDdlDmlApply: false
+      allowSourceApply: false
+      allowDeploy: false
+      allowRawPromptStorage: false
+      allowRawProviderResponseStorage: false
   result:
     path: spec/codex-runner/service_codex_run_result.schema.json
     schemaVersion: ServiceCodexRunResult.v1
@@ -64,6 +72,7 @@ runnerSchemas:
       - BLOCKED
       - REVIEW_REQUIRED
     productionReady: false
+    reviewRequired: true
     validationKeys:
       - schemaValid
       - policyValid

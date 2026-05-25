@@ -56,6 +56,81 @@ def test_validation_shell_auto_uses_bash_off_windows(monkeypatch):
     assert runner.build_validation_command("make test", "auto") == ["bash", "-lc", "make test"]
 
 
+def test_validation_env_adds_explicit_python_make_and_path(tmp_path, monkeypatch):
+    python_bin = tmp_path / "Python314" / "python.exe"
+    make_bin = tmp_path / "Make" / "bin" / "make.exe"
+    extra_dir = tmp_path / "tools"
+    args = SimpleNamespace(
+        validation_path_prepend=[str(extra_dir)],
+        validation_python=str(python_bin),
+        validation_make=str(make_bin),
+    )
+    monkeypatch.setenv("PATH", "C:\\Windows")
+
+    env = runner.build_validation_env(args)
+    path_parts = env["PATH"].split(runner.os.pathsep)
+
+    assert env["PYTHON"] == str(python_bin)
+    assert path_parts[:3] == [str(extra_dir), str(python_bin.parent), str(make_bin.parent)]
+
+
+def test_stage_boundaries_match_goal_plan(tmp_path):
+    goals = [tmp_path / "goals" / f"G{i:02d}-goal.md" for i in range(13)]
+
+    assert [goal.name for goal in goals if runner.is_stage_boundary(goal)] == [
+        "G02-goal.md",
+        "G07-goal.md",
+        "G10-goal.md",
+        "G12-goal.md",
+    ]
+    assert [goal.name for goal in runner.goals_through_stage_boundary(goals, goals[7])] == [
+        f"G{i:02d}-goal.md" for i in range(8)
+    ]
+
+
+def test_stage_validation_deduplicates_matching_commands(tmp_path, monkeypatch):
+    goal_dir = tmp_path / "goals"
+    goal_dir.mkdir()
+    goals = []
+    for i in range(3):
+        goal = goal_dir / f"G{i:02d}-goal.md"
+        goal.write_text("## Validation commands\n\n```bash\nmake test\n```\n", encoding="utf-8")
+        goals.append(goal)
+
+    calls = []
+
+    def fake_run_command(cmd, cwd, log_path=None, input_text=None, env=None):
+        calls.append(cmd)
+        assert env is not None
+        assert env["PYTHON"].endswith("python.exe")
+        assert log_path is not None
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("ok\n", encoding="utf-8")
+        return 0, "", ""
+
+    monkeypatch.setattr(runner, "run_command", fake_run_command)
+    args = SimpleNamespace(
+        workspace=tmp_path,
+        validation_shell="powershell",
+        validation_path_prepend=[],
+        validation_python=str(tmp_path / "Python314" / "python.exe"),
+        validation_make=None,
+    )
+
+    ok, result = runner.run_stage_validation(
+        "Foundation Complete",
+        goals,
+        args,
+        tmp_path / ".codex-goals" / "runs" / "stage",
+        "poststage-G02",
+    )
+
+    assert ok is True
+    assert result is None
+    assert len(calls) == 1
+    assert "make test" in calls[0][-1]
+
+
 def test_auto_commit_git_add_excludes_runner_state_dir(tmp_path):
     args = SimpleNamespace(workspace=tmp_path, state_dir=tmp_path / ".codex-goals")
 
@@ -92,6 +167,44 @@ def test_execute_prompt_includes_last_failed_retry_context(tmp_path):
     assert 'address those blockers explicitly before returning "pass"' in prompt
     assert "You may strengthen the current goal file or previous goal files" in prompt
     assert "Do not edit later goal files" in prompt
+    assert "Stage gates:" in prompt
+    assert "Outer validation gates run only at stage boundaries G02, G07, G10, and G12" in prompt
+
+
+def test_execute_prompt_requires_concrete_repair_for_previous_stage_regression(tmp_path):
+    workspace = tmp_path
+    goals = [workspace / "goals" / f"G{i:02d}-goal.md" for i in range(8)]
+    retry_result = {
+        "status": "fail",
+        "earliest_failed_goal": "goals/G00-goal.md",
+        "summary": "Foundation contract regressed during MVP gate.",
+        "changed_files": [],
+        "validation": "semantic verifier failed",
+        "blockers": ["G00 no longer blocks procedure execution"],
+        "remaining_risks": [],
+        "confidence": 1,
+    }
+    runner.annotate_previous_stage_regression(retry_result, goals, 7, 0, "MVP Complete")
+
+    prompt = runner.build_execute_prompt(goals[0], goals, 0, workspace, retry_result)
+
+    assert "requires_concrete_repair: true" in prompt
+    assert "completed previous stage regressed" in prompt
+    assert "changed_files must include" in prompt
+
+
+def test_concrete_repair_failure_result_rejects_empty_changed_files(tmp_path):
+    goal_file = tmp_path / "goals" / "G00-goal.md"
+    retry_result = {
+        "_requires_concrete_repair": True,
+        "_regressed_from_stage": "MVP Complete",
+    }
+
+    result = runner.concrete_repair_failure_result(goal_file, tmp_path, retry_result)
+
+    assert result["status"] == "fail"
+    assert result["_requires_concrete_repair"] is True
+    assert "changed_files" in result["blockers"][0]
 
 
 def test_run_validation_returns_failure_context_when_commands_are_missing(tmp_path):

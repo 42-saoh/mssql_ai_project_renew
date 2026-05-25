@@ -53,11 +53,17 @@ Every goal must include:
 When the user asks to run goals in `goals/`, follow this contract:
 
 - Goal files are ordered lexicographically by filename: `G00`, `G01`, `G02`, ...
-- Never execute a later goal before all earlier goals are validated.
+- Never execute a later goal before all earlier goals are completed; previous completed stages must remain validated.
 - Execute exactly one goal at a time.
-- Before starting goal `GNN`, re-check all goals `G00` through `G(N-1)`.
+- Outer validation gates run at stage boundaries only:
+  - Foundation Complete: `G00`, `G01`, `G02`
+  - MVP Complete: `G03`, `G04`, `G05`, `G06`, `G07`
+  - Feature Complete: `G08`, `G09`, `G10`
+  - Release Complete: `G11`, `G12`
+- Between stage boundaries, keep goals sequential but defer full outer validation until the current stage boundary.
 - If any previous goal is incomplete, broken, or inconsistent, return to the earliest failing goal and resume sequentially from there.
 - Treat previous goals as regression contracts.
+- If a completed previous stage regresses, completion requires concrete changed files or a strengthened implementation, test, spec, or goal-document contract that repairs or captures the regression.
 - Do not copy legacy implementation code.
 - Do not weaken blocked-operation policy.
 - Do not merge Development Codex and Service Codex Runner realms.

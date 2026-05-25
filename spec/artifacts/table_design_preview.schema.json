@@ -2,12 +2,40 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "required": [
+    "artifactType",
+    "title",
+    "contentMarkdown",
+    "evidenceRefs",
+    "reviewMarkers",
     "previewType",
     "createTableScriptPreview",
     "reviewRequired",
     "blockedFromAutoApply"
   ],
   "properties": {
+    "artifactType": {
+      "const": "TABLE_DESIGN_PREVIEW"
+    },
+    "title": {
+      "type": "string"
+    },
+    "contentMarkdown": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "reviewMarkers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
     "previewType": {
       "const": "TABLE_DESIGN_PREVIEW"
     },

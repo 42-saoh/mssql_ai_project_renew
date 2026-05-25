@@ -6,6 +6,7 @@ import yaml
 from jsonschema import Draft202012Validator
 
 from plf_agent_contracts.enums import ArtifactType, Intent, RunStatus
+from plf_agent_contracts.policy import DEFAULT_RUNTIME_POLICY
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "spec/development/contract_schema_eval_baseline.yaml"
@@ -104,9 +105,98 @@ def test_json_schemas_are_valid_draft_2020_12_and_match_baseline_enums():
     assert result_schema["properties"]["productionReady"]["const"] is False
 
 
+def test_runner_request_policy_schema_requires_closed_false_safety_invariants():
+    baseline = _yaml("spec/development/contract_schema_eval_baseline.yaml")
+    expected_policy = baseline["runnerSchemas"]["request"]["requiredPolicy"]
+    request_schema = _json(baseline["runnerSchemas"]["request"]["path"])
+    openapi = _yaml(baseline["openapi"]["path"])
+
+    assert expected_policy == DEFAULT_RUNTIME_POLICY
+
+    policy_schemas = [
+        request_schema["properties"]["policy"],
+        openapi["components"]["schemas"]["ServiceCodexRunRequest"]["properties"]["policy"],
+    ]
+    for policy_schema in policy_schemas:
+        assert set(policy_schema["required"]) == set(expected_policy)
+        assert policy_schema["additionalProperties"] is False
+        for key, expected in expected_policy.items():
+            assert policy_schema["properties"][key]["const"] is expected
+
+    payload = {
+        "schemaVersion": "ServiceCodexRunRequest.v1",
+        "runType": "SP_ANALYSIS",
+        "chatRunId": "chatrun_1",
+        "conversationId": "conv_1",
+        "target": {
+            "dbProfileId": "master",
+            "objectType": "PROCEDURE",
+            "schema": "dbo",
+            "name": "X",
+            "targetKey": "master.PROCEDURE.dbo.X",
+        },
+        "policy": dict(expected_policy),
+        "toolMode": "EVIDENCE_BUNDLE_ONLY",
+        "skillAllowlist": ["runtime-sp-analysis"],
+        "outputSchema": "service_codex_run_result.schema.json",
+    }
+    validator = Draft202012Validator(request_schema)
+    validator.validate(payload)
+
+    unsafe_payload = {**payload, "policy": {**expected_policy, "allowRowData": True}}
+    assert list(validator.iter_errors(unsafe_payload))
+
+    missing_payload = {**payload, "policy": dict(expected_policy)}
+    missing_payload["policy"].pop("allowDeploy")
+    assert list(validator.iter_errors(missing_payload))
+
+    extra_payload = {**payload, "policy": {**expected_policy, "allowSchemaMutation": False}}
+    assert list(validator.iter_errors(extra_payload))
+
+
+def test_runner_result_contract_requires_review_required_proposals():
+    baseline = _yaml("spec/development/contract_schema_eval_baseline.yaml")
+    result_schema = _json(baseline["runnerSchemas"]["result"]["path"])
+    openapi = _yaml(baseline["openapi"]["path"])
+
+    assert baseline["runnerSchemas"]["result"]["reviewRequired"] is True
+    assert result_schema["properties"]["reviewRequired"]["const"] is True
+    assert openapi["components"]["schemas"]["ServiceCodexRunResult"]["properties"]["reviewRequired"]["const"] is True
+
+    payload = {
+        "schemaVersion": "ServiceCodexRunResult.v1",
+        "runType": "SP_ANALYSIS",
+        "targetKey": "master.PROCEDURE.dbo.X",
+        "status": "SUCCEEDED",
+        "productionReady": False,
+        "reviewRequired": True,
+        "artifactProposals": [
+            {
+                "artifactType": "SP_ANALYSIS_DOC",
+                "title": "Analysis",
+                "contentMarkdown": "REVIEW_REQUIRED",
+                "evidenceRefs": ["evidence.1"],
+                "reviewMarkers": ["REVIEW_REQUIRED"],
+            }
+        ],
+        "blockers": [],
+        "validation": {
+            "schemaValid": True,
+            "policyValid": True,
+            "staticValidationPassed": True,
+        },
+    }
+    validator = Draft202012Validator(result_schema)
+    validator.validate(payload)
+
+    false_review_payload = {**payload, "reviewRequired": False}
+    assert list(validator.iter_errors(false_review_payload))
+
+
 def test_artifact_schemas_match_allowed_and_retired_taxonomy():
     baseline = _yaml("spec/development/contract_schema_eval_baseline.yaml")
     allowed = set(baseline["artifactSchemas"]["allowedPublicArtifactTypes"])
+    preview_only = set(baseline["artifactSchemas"]["previewOnlyArtifactTypes"])
     retired = set(baseline["artifactSchemas"]["retiredPublicArtifactTypes"])
 
     assert allowed == {item.value for item in ArtifactType}
@@ -114,14 +204,35 @@ def test_artifact_schemas_match_allowed_and_retired_taxonomy():
 
     for path in baseline["artifactSchemas"]["paths"]:
         schema = _json(path)
-        if "artifactType" in schema.get("properties", {}):
-            enum = set(schema["properties"]["artifactType"]["enum"])
-            assert allowed <= enum
-            assert enum.isdisjoint(retired)
-            for required in baseline["artifactSchemas"]["requiredArtifactFields"]:
-                assert required in schema["required"]
-            assert schema["properties"]["evidenceRefs"]["minItems"] == 1
-            assert schema["properties"]["reviewMarkers"]["minItems"] == 1
+        for required in baseline["artifactSchemas"]["requiredArtifactFields"]:
+            assert required in schema["required"]
+        assert schema["properties"]["evidenceRefs"]["minItems"] == 1
+        assert schema["properties"]["reviewMarkers"]["minItems"] == 1
+
+        artifact_type_schema = schema["properties"]["artifactType"]
+        if "const" in artifact_type_schema:
+            declared = {artifact_type_schema["const"]}
+        else:
+            declared = set(artifact_type_schema["enum"])
+
+        assert declared.isdisjoint(retired)
+        if Path(path).name == "table_design_preview.schema.json":
+            assert declared == preview_only
+            assert schema["properties"]["reviewRequired"]["const"] is True
+            assert schema["properties"]["blockedFromAutoApply"]["const"] is True
+        else:
+            assert allowed <= declared
+            assert declared <= allowed
+
+
+def test_runtime_result_schemas_match_canonical_runner_result_contract():
+    canonical = _json("spec/codex-runner/service_codex_run_result.schema.json")
+    runtime_schema_dir = ROOT / "services/codex-runner/runtime-template/schemas"
+
+    for path in sorted(runtime_schema_dir.glob("*.schema.json")):
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        if schema.get("title") == "ServiceCodexRunResult":
+            assert schema == canonical, path.name
 
 
 def test_eval_baseline_declares_cases_for_all_required_suites():

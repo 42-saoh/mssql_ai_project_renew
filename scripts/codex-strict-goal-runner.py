@@ -5,7 +5,7 @@ Strict sequential Codex goal runner.
 What it enforces:
 1. Goal files are executed in lexical order: goals/G00..., G01..., G02...
 2. Only one goal is given to Codex per run.
-3. Before moving to a later goal, all previous goals are re-validated.
+3. Validation gates run only at named stage boundaries: G02, G07, G10, and G12.
 4. If a previous goal fails validation or semantic verification, all later goals are marked pending
    and execution returns to the earliest failing goal.
 5. Results, prompts, validation logs, and state are stored under .codex-goals/.
@@ -35,6 +35,13 @@ STATUS_PENDING = "pending"
 STATUS_DONE = "done"
 STATUS_FAILED = "failed"
 STATUS_BLOCKED = "blocked"
+
+STAGE_DEFINITIONS: List[Tuple[str, int, int]] = [
+    ("Foundation Complete", 0, 2),
+    ("MVP Complete", 3, 7),
+    ("Feature Complete", 8, 10),
+    ("Release Complete", 11, 12),
+]
 
 
 RESULT_SCHEMA: Dict[str, Any] = {
@@ -200,6 +207,62 @@ def discover_goals(goals_dir: Path) -> List[Path]:
     return goals
 
 
+def goal_number(goal_file: Path) -> Optional[int]:
+    match = re.match(r"G(\d{2})", goal_file.name)
+    return int(match.group(1)) if match else None
+
+
+def stage_for_goal_number(number: int) -> Optional[Tuple[str, int, int]]:
+    for stage in STAGE_DEFINITIONS:
+        _, start, end = stage
+        if start <= number <= end:
+            return stage
+    return None
+
+
+def stage_for_goal(goal_file: Path) -> Optional[Tuple[str, int, int]]:
+    number = goal_number(goal_file)
+    if number is None:
+        return None
+    return stage_for_goal_number(number)
+
+
+def is_stage_boundary(goal_file: Path) -> bool:
+    stage = stage_for_goal(goal_file)
+    number = goal_number(goal_file)
+    return stage is not None and number == stage[2]
+
+
+def stage_lines() -> str:
+    return "\n".join(
+        f"- {name}: G{start:02d} through G{end:02d}"
+        for name, start, end in STAGE_DEFINITIONS
+    )
+
+
+def goals_through_stage_boundary(goals: List[Path], boundary_goal: Path) -> List[Path]:
+    boundary_number = goal_number(boundary_goal)
+    if boundary_number is None:
+        return [boundary_goal]
+    return [
+        goal
+        for goal in goals
+        if (number := goal_number(goal)) is not None and number <= boundary_number
+    ]
+
+
+def stage_ordinal_for_goal_index(goals: List[Path], index: int) -> Optional[int]:
+    if index < 0 or index >= len(goals):
+        return None
+    number = goal_number(goals[index])
+    if number is None:
+        return None
+    for ordinal, (_, start, end) in enumerate(STAGE_DEFINITIONS):
+        if start <= number <= end:
+            return ordinal
+    return None
+
+
 def extract_validation_commands(goal_text: str) -> str:
     """Extract fenced bash block(s) under '## Validation commands'."""
     lines = goal_text.splitlines()
@@ -328,6 +391,46 @@ def build_validation_command(commands: str, validation_shell: str) -> List[str]:
     raise ValueError(f"Unsupported validation shell: {validation_shell}")
 
 
+def split_path_list(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    return [part.strip().strip('"') for part in raw.split(os.pathsep) if part.strip()]
+
+
+def path_entry_for_tool(raw: str) -> str:
+    path = Path(os.path.expandvars(raw.strip().strip('"')))
+    if path.suffix.lower() in {".bat", ".cmd", ".com", ".exe"}:
+        return str(path.parent)
+    return str(path)
+
+
+def build_validation_env(args: argparse.Namespace) -> Dict[str, str]:
+    env = os.environ.copy()
+    prepended: List[str] = []
+
+    for raw in split_path_list(os.environ.get("CODEX_GOAL_RUNNER_PATH_PREPEND")):
+        prepended.append(path_entry_for_tool(raw))
+    for raw_arg in getattr(args, "validation_path_prepend", []) or []:
+        for raw in split_path_list(raw_arg):
+            prepended.append(path_entry_for_tool(raw))
+
+    python_bin = getattr(args, "validation_python", None) or os.environ.get("CODEX_GOAL_RUNNER_PYTHON")
+    if python_bin:
+        python_bin = python_bin.strip().strip('"')
+        env["PYTHON"] = python_bin
+        prepended.append(path_entry_for_tool(python_bin))
+
+    make_bin = getattr(args, "validation_make", None) or os.environ.get("CODEX_GOAL_RUNNER_MAKE")
+    if make_bin:
+        make_bin = make_bin.strip().strip('"')
+        prepended.append(path_entry_for_tool(make_bin))
+
+    if prepended:
+        existing_path = env.get("PATH", "")
+        env["PATH"] = os.pathsep.join(prepended + ([existing_path] if existing_path else []))
+    return env
+
+
 def goal_relative(path: Path, workspace: Path) -> str:
     try:
         return str(path.relative_to(workspace))
@@ -414,7 +517,7 @@ def run_validation(goal_file: Path, args: argparse.Namespace, run_dir: Path, lab
     log_path = run_dir / f"{label}.validation.log"
     cmd = build_validation_command(commands, args.validation_shell)
     print_step(f"Running validation for {goal_file.name} with {cmd[0]}: {commands!r}")
-    code, _, _ = run_command(cmd, cwd=args.workspace, log_path=log_path)
+    code, _, _ = run_command(cmd, cwd=args.workspace, log_path=log_path, env=build_validation_env(args))
     if code == 0:
         print_step(f"Validation passed for {goal_file.name}")
         return True, None
@@ -428,6 +531,54 @@ def run_validation(goal_file: Path, args: argparse.Namespace, run_dir: Path, lab
     )
 
 
+def run_stage_validation(
+    stage_name: str,
+    goal_files: List[Path],
+    args: argparse.Namespace,
+    run_dir: Path,
+    label: str,
+) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    commands_by_text: Dict[str, Path] = {}
+    for goal_file in goal_files:
+        commands = extract_validation_commands(read_file(goal_file))
+        if not commands:
+            log_path = run_dir / f"{label}.validation.missing.log"
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(
+                f"No validation commands found under ## Validation commands in {goal_file.name}.\n",
+                encoding="utf-8",
+            )
+            return False, validation_failure_result(
+                goal_file,
+                args.workspace,
+                f"{stage_name} stage",
+                "No validation commands found under ## Validation commands.",
+                log_path,
+            )
+        commands_by_text.setdefault(commands, goal_file)
+
+    for ordinal, (commands, source_goal) in enumerate(commands_by_text.items(), start=1):
+        log_path = run_dir / f"{label}.validation-{ordinal:02d}.log"
+        cmd = build_validation_command(commands, args.validation_shell)
+        print_step(
+            f"Running {stage_name} stage validation with {cmd[0]} "
+            f"from {source_goal.name}: {commands!r}"
+        )
+        code, _, _ = run_command(cmd, cwd=args.workspace, log_path=log_path, env=build_validation_env(args))
+        if code != 0:
+            print_step(f"{stage_name} stage validation failed; see {log_path}")
+            return False, validation_failure_result(
+                source_goal,
+                args.workspace,
+                f"{stage_name} stage",
+                f"Validation command failed with exit code {code}: {commands}",
+                log_path,
+            )
+
+    print_step(f"{stage_name} stage validation passed")
+    return True, None
+
+
 def format_retry_context(result: Optional[Dict[str, Any]]) -> str:
     if not result or result.get("status") == "pass":
         return "- none"
@@ -436,6 +587,11 @@ def format_retry_context(result: Optional[Dict[str, Any]]) -> str:
         f"- status: {result.get('status', 'unknown')}",
         f"- earliest_failed_goal: {result.get('earliest_failed_goal')}",
     ]
+    if result.get("_requires_concrete_repair"):
+        lines.append(
+            "- requires_concrete_repair: true; returning pass requires concrete changed_files "
+            "or a strengthened goal/spec/test contract"
+        )
     summary = str(result.get("summary", "")).strip()
     if summary:
         lines.append(f"- summary: {summary}")
@@ -464,6 +620,12 @@ def build_execute_prompt(
     current_rel = goal_relative(goal_file, workspace)
     all_goal_order = "\n".join(f"{i:02d}. {goal_relative(p, workspace)}" for i, p in enumerate(goals))
     retry_context = format_retry_context(retry_result)
+    current_stage = stage_for_goal(goal_file)
+    current_stage_line = (
+        f"{current_stage[0]} (G{current_stage[1]:02d} through G{current_stage[2]:02d})"
+        if current_stage
+        else "- unknown"
+    )
 
     return f"""
 You are running a STRICT SEQUENTIAL GOAL PIPELINE.
@@ -471,8 +633,12 @@ You are running a STRICT SEQUENTIAL GOAL PIPELINE.
 Goal order:
 {all_goal_order}
 
+Stage gates:
+{stage_lines()}
+
 Current goal index: {index:02d}
 Current goal file: {current_rel}
+Current stage: {current_stage_line}
 Previous goal files that must remain fully satisfied:
 {previous}
 
@@ -486,20 +652,21 @@ Hard rules:
 4. Before implementing, read the current goal file and all previous goal files.
 5. If you discover that an earlier goal is not fully satisfied, stop current work and return status "fail" with earliest_failed_goal set to that earlier Gxx file. Do not start later work.
 6. Implement only what is needed for the current goal's Objective, Required deliverables, Acceptance criteria, Constraints, and Non-goals.
-7. Run the current goal's Validation commands if feasible.
+7. Outer validation gates run only at stage boundaries G02, G07, G10, and G12. For non-boundary goals, run focused checks if feasible and expect the outer runner to defer full validation until the stage boundary.
 8. Never weaken policy boundaries. Never copy legacy implementation code. Never merge Development Codex and Service Codex Runner realms.
 9. Do not install new dependencies, perform destructive changes, deploy, access production data, or apply DDL/DML unless the current goal explicitly permits it.
 10. Finish with JSON only, matching the provided schema.
 11. If retry context is not "- none", address those blockers explicitly before returning "pass"; if a blocker is not valid, explain why in summary and validation.
 12. Regression repair may include implementation, tests, specs, and root development goal documents up to and including {current_rel}. You may strengthen the current goal file or previous goal files when the retry context exposes missing acceptance criteria, missing validation commands, vague deliverables, or missing regression coverage.
 13. Do not edit later goal files. Do not weaken or delete any Objective, Non-goal, Constraint, Acceptance criterion, Validation command, Stop condition, safety policy, or realm boundary. Goal-document changes must make the contract stricter, clearer, or more verifiable.
+14. If retry context says requires_concrete_repair because a completed previous stage regressed, "pass" requires changed_files to name at least one implementation, test, spec, or goal-document contract change that directly repairs or captures that regression.
 
 Definition of pass:
 - The current goal's acceptance criteria are satisfied.
-- The current goal's validation commands pass, or you clearly explain what command the outer runner must run.
+- If this is a stage-boundary goal, the completed stage's validation commands pass, or you clearly explain what command the outer runner must run. If this is not a stage-boundary goal, full validation may be deferred to the stage boundary.
 - All previous goals still appear satisfied.
 - No stop condition, non-goal, or constraint is violated.
-- If retry context identified a real gap, changed_files should include at least one implementation, test, spec, or goal-document change that directly closes or captures that gap.
+- If retry context identified a real gap, changed_files must include at least one implementation, test, spec, or goal-document change that directly closes or captures that gap.
 """.strip()
 
 
@@ -527,6 +694,41 @@ Hard rules:
 9. Finish with JSON only, matching the provided schema.
 
 Important: The outer runner separately runs the goal's Validation commands. Your job is semantic acceptance verification.
+""".strip()
+
+
+def build_stage_verify_prompt(
+    stage_name: str,
+    boundary_goal: Path,
+    included_goals: List[Path],
+    workspace: Path,
+) -> str:
+    boundary_rel = goal_relative(boundary_goal, workspace)
+    included = "\n".join(f"- {goal_relative(p, workspace)}" for p in included_goals)
+
+    return f"""
+You are a STRICT READ-ONLY VERIFIER for a sequential Codex stage gate.
+
+Stage gate: {stage_name}
+Stage boundary goal: {boundary_rel}
+
+Stage definitions:
+{stage_lines()}
+
+Goal files included in this stage validation:
+{included}
+
+Hard rules:
+1. Do not modify files.
+2. Read every included goal file and inspect the repository state.
+3. Check Objective, Required deliverables, Acceptance criteria, Constraints, Non-goals, and Stop conditions for every included goal.
+4. Return status "pass" only if every included goal is fully satisfied and no prior-stage contract appears broken.
+5. If any included goal is now not satisfied, return status "fail" and set earliest_failed_goal to the earliest failing Gxx file.
+6. If blocked by missing context or ambiguous requirements, return status "blocked".
+7. When returning "fail" or "blocked", make blockers actionable: identify the concrete implementation, test, spec, or goal-document gap that should be repaired. If the goal document is too vague to verify the intended contract, say that explicitly.
+8. Finish with JSON only, matching the provided schema.
+
+Important: The outer runner separately runs the stage's deduplicated Validation commands. Your job is semantic stage acceptance verification.
 """.strip()
 
 
@@ -574,6 +776,51 @@ def earliest_failed_index(result: Dict[str, Any], goals: List[Path], default: in
         if 0 <= n < len(goals):
             return n
     return default
+
+
+def annotate_previous_stage_regression(
+    result: Dict[str, Any],
+    goals: List[Path],
+    boundary_idx: int,
+    failed_idx: int,
+    stage_name: str,
+) -> Dict[str, Any]:
+    boundary_stage = stage_ordinal_for_goal_index(goals, boundary_idx)
+    failed_stage = stage_ordinal_for_goal_index(goals, failed_idx)
+    if boundary_stage is not None and failed_stage is not None and failed_stage < boundary_stage:
+        result["_requires_concrete_repair"] = True
+        result["_regressed_from_stage"] = stage_name
+    return result
+
+
+def result_has_concrete_changed_files(result: Dict[str, Any]) -> bool:
+    return any(str(path).strip() for path in result.get("changed_files") or [])
+
+
+def concrete_repair_failure_result(
+    goal_file: Path,
+    workspace: Path,
+    retry_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    current_rel = goal_relative(goal_file, workspace)
+    regression_stage = retry_result.get("_regressed_from_stage", "a later stage gate")
+    reason = (
+        "Previous-stage regression repair requires changed_files to include at least one "
+        "implementation, test, spec, or goal-document contract change."
+    )
+    return {
+        "status": "fail",
+        "goal_file": current_rel,
+        "earliest_failed_goal": current_rel,
+        "summary": f"Concrete repair evidence is missing after regression from {regression_stage}.",
+        "changed_files": [],
+        "validation": reason,
+        "blockers": [reason],
+        "remaining_risks": ["The regression cannot be marked complete without concrete changed_files evidence."],
+        "confidence": 1,
+        "_requires_concrete_repair": True,
+        "_regressed_from_stage": regression_stage,
+    }
 
 
 def relative_pathspec(path: Path, workspace: Path) -> Optional[str]:
@@ -634,6 +881,9 @@ def main() -> int:
     parser.add_argument("--sandbox", default="workspace-write", choices=["read-only", "workspace-write", "danger-full-access"], help="Sandbox for execution runs")
     parser.add_argument("--verify-sandbox", default="read-only", choices=["read-only", "workspace-write", "danger-full-access"], help="Sandbox for semantic verification runs")
     parser.add_argument("--validation-shell", default="auto", choices=["auto", "bash", "powershell", "cmd"], help="Shell used for goal validation commands")
+    parser.add_argument("--validation-path-prepend", action="append", default=[], help="Extra PATH entries for validation commands; repeatable and may contain OS path separators")
+    parser.add_argument("--validation-python", default=None, help="Python executable used by Makefile validation through the PYTHON environment variable")
+    parser.add_argument("--validation-make", default=None, help="Make executable path; its parent directory is prepended to validation PATH")
     parser.add_argument("--max-rounds", type=int, default=80, help="Overall loop limit")
     parser.add_argument("--max-attempts-per-goal", type=int, default=5, help="Stop after this many execution attempts per goal")
     parser.add_argument("--skip-git-repo-check", action="store_true", help="Pass --skip-git-repo-check to Codex and bypass local git check")
@@ -679,38 +929,6 @@ def main() -> int:
 
             print_step(f"Round {rounds}; next candidate: {state['goals'][first_pending]['name']}")
 
-            # Re-verify every prior done goal before moving forward.
-            regression_idx: Optional[int] = None
-            for j in range(first_pending):
-                goal_file = goals[j]
-                run_id = f"round-{rounds:03d}-preverify-G{j:02d}-{now_stamp()}"
-                run_dir = args.state_dir / "runs" / run_id
-
-                validation_ok, validation_failure = run_validation(goal_file, args, run_dir, f"preverify-G{j:02d}")
-                if not validation_ok:
-                    state["goals"][j]["last_result"] = validation_failure
-                    regression_idx = j
-                    save_state(state_file, state)
-                    break
-
-                if not args.no_semantic_verify:
-                    prompt = build_verify_prompt(goal_file, goals, j, args.workspace)
-                    result = run_codex_for_prompt(args, prompt, run_dir, f"preverify-G{j:02d}", sandbox=args.verify_sandbox)
-                    state["goals"][j]["last_result"] = result
-                    if not verifier_passed(result):
-                        regression_idx = earliest_failed_index(result, goals, j)
-                        state["goals"][regression_idx]["last_result"] = result
-                        break
-                    state["goals"][j]["last_verified_at"] = dt.datetime.now().isoformat()
-                    save_state(state_file, state)
-
-            if regression_idx is not None:
-                print_step(f"Regression detected at {state['goals'][regression_idx]['name']}; returning to that goal.")
-                mark_from_pending(state, regression_idx)
-                state["goals"][regression_idx]["status"] = STATUS_FAILED
-                save_state(state_file, state)
-                first_pending = regression_idx
-
             current = state["goals"][first_pending]
             if current.get("attempts", 0) >= args.max_attempts_per_goal:
                 print_step(f"Max attempts reached for {current['name']}; stopping.")
@@ -725,8 +943,16 @@ def main() -> int:
 
             run_id = f"round-{rounds:03d}-execute-G{first_pending:02d}-attempt-{current['attempts']}-{now_stamp()}"
             run_dir = args.state_dir / "runs" / run_id
-            prompt = build_execute_prompt(goal_file, goals, first_pending, args.workspace, current.get("last_result"))
+            retry_result = current.get("last_result")
+            prompt = build_execute_prompt(goal_file, goals, first_pending, args.workspace, retry_result)
             result = run_codex_for_prompt(args, prompt, run_dir, f"execute-G{first_pending:02d}", sandbox=args.sandbox)
+            if (
+                retry_result
+                and retry_result.get("_requires_concrete_repair")
+                and verifier_passed(result)
+                and not result_has_concrete_changed_files(result)
+            ):
+                result = concrete_repair_failure_result(goal_file, args.workspace, retry_result)
             current["last_result"] = result
             save_state(state_file, state)
 
@@ -739,29 +965,76 @@ def main() -> int:
                 save_state(state_file, state)
                 continue
 
-            validation_ok, validation_failure = run_validation(goal_file, args, run_dir, f"postexecute-G{first_pending:02d}")
-            if not validation_ok:
-                print_step(f"Post-execution validation failed for {current['name']}; retrying same goal later.")
-                current["status"] = STATUS_FAILED
-                current["last_result"] = validation_failure
-                save_state(state_file, state)
-                continue
-
-            if not args.no_semantic_verify:
-                verify_prompt = build_verify_prompt(goal_file, goals, first_pending, args.workspace)
-                verify_result = run_codex_for_prompt(args, verify_prompt, run_dir, f"postverify-G{first_pending:02d}", sandbox=args.verify_sandbox)
-                current["last_result"] = verify_result
-                if not verifier_passed(verify_result):
-                    failed_idx = earliest_failed_index(verify_result, goals, first_pending)
-                    print_step(f"Semantic verification failed. Returning to {state['goals'][failed_idx]['name']}.")
+            if is_stage_boundary(goal_file):
+                stage = stage_for_goal(goal_file)
+                assert stage is not None
+                stage_name, _, _ = stage
+                stage_goals = goals_through_stage_boundary(goals, goal_file)
+                validation_ok, validation_failure = run_stage_validation(
+                    stage_name,
+                    stage_goals,
+                    args,
+                    run_dir,
+                    f"poststage-G{first_pending:02d}",
+                )
+                if not validation_ok:
+                    failed_idx = earliest_failed_index(validation_failure or {}, goals, first_pending)
+                    validation_failure = annotate_previous_stage_regression(
+                        validation_failure or {},
+                        goals,
+                        first_pending,
+                        failed_idx,
+                        stage_name,
+                    )
+                    print_step(
+                        f"{stage_name} stage validation failed; returning to {state['goals'][failed_idx]['name']}."
+                    )
                     mark_from_pending(state, failed_idx)
                     state["goals"][failed_idx]["status"] = STATUS_FAILED
-                    state["goals"][failed_idx]["last_result"] = verify_result
+                    state["goals"][failed_idx]["last_result"] = validation_failure
                     save_state(state_file, state)
                     continue
 
+                if not args.no_semantic_verify:
+                    verify_prompt = build_stage_verify_prompt(stage_name, goal_file, stage_goals, args.workspace)
+                    verify_result = run_codex_for_prompt(
+                        args,
+                        verify_prompt,
+                        run_dir,
+                        f"poststage-verify-G{first_pending:02d}",
+                        sandbox=args.verify_sandbox,
+                    )
+                    current["last_result"] = verify_result
+                    if not verifier_passed(verify_result):
+                        failed_idx = earliest_failed_index(verify_result, goals, first_pending)
+                        verify_result = annotate_previous_stage_regression(
+                            verify_result,
+                            goals,
+                            first_pending,
+                            failed_idx,
+                            stage_name,
+                        )
+                        print_step(
+                            f"{stage_name} semantic verification failed. Returning to {state['goals'][failed_idx]['name']}."
+                        )
+                        mark_from_pending(state, failed_idx)
+                        state["goals"][failed_idx]["status"] = STATUS_FAILED
+                        state["goals"][failed_idx]["last_result"] = verify_result
+                        save_state(state_file, state)
+                        continue
+
+                verified_at = dt.datetime.now().isoformat()
+                for j in range(first_pending + 1):
+                    state["goals"][j]["last_verified_at"] = verified_at
+                    if j < first_pending:
+                        state["goals"][j]["status"] = STATUS_DONE
+                save_state(state_file, state)
+            else:
+                stage = stage_for_goal(goal_file)
+                if stage:
+                    print_step(f"Stage validation deferred until {stage[0]} boundary G{stage[2]:02d}.")
+
             current["status"] = STATUS_DONE
-            current["last_verified_at"] = dt.datetime.now().isoformat()
             save_state(state_file, state)
             auto_commit_if_requested(args, goal_file, run_dir)
             print_step(f"Completed {current['name']}")

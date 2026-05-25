@@ -4,9 +4,11 @@ allow_login_shell = false
 web_search = "cached"
 model_reasoning_effort = "xhigh"
 model_reasoning_summary = "auto"
+service_tier = "fast"
 
 [features]
 goals = true
+fast_mode = true
 
 [agents]
 max_threads = 6
