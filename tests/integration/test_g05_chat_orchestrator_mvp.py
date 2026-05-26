@@ -80,6 +80,10 @@ def test_hard_blocked_chat_has_checkpoint_without_downstream_side_effects():
         "테이블 목록 보여줘",
         "데이터베이스 프로시저 조회해줘",
         "프로시저 목록 보여줘",
+        "모든 컬럼 조회해줘",
+        "테이블들 조회해줘",
+        "프로시저들 보여줘",
+        "전체 데이터베이스 객체 검색해줘",
     ],
 )
 def test_db_themed_general_chat_has_no_downstream_side_effects(monkeypatch, message):

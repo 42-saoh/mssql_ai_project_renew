@@ -32,6 +32,10 @@ def test_db_themed_general_chat_is_not_metadata_search():
     assert classify_intent("테이블 메타데이터 보여줘") == Intent.BLOCKED
     assert classify_intent("모든 테이블들 조회해줘") == Intent.BLOCKED
     assert classify_intent("저장 프로시저 전부 보여줘") == Intent.BLOCKED
+    assert classify_intent("모든 컬럼 조회해줘") == Intent.BLOCKED
+    assert classify_intent("테이블들 조회해줘") == Intent.BLOCKED
+    assert classify_intent("프로시저들 보여줘") == Intent.BLOCKED
+    assert classify_intent("전체 데이터베이스 객체 검색해줘") == Intent.BLOCKED
 
 
 def test_concrete_metadata_lookup_shape_is_still_supported():
@@ -40,3 +44,5 @@ def test_concrete_metadata_lookup_shape_is_still_supported():
     assert classify_intent("Find metadata for dbo.Customer") == Intent.METADATA_SEARCH
     assert classify_intent("주문 테이블 메타데이터 조회해줘") == Intent.METADATA_SEARCH
     assert classify_intent("고객테이블 컬럼 찾아줘") == Intent.METADATA_SEARCH
+    assert classify_intent("결제 테이블들 조회해줘") == Intent.METADATA_SEARCH
+    assert classify_intent("주문_상세 컬럼 메타데이터 찾아줘") == Intent.METADATA_SEARCH

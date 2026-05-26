@@ -86,6 +86,10 @@ def test_g05_supported_intents_route_to_expected_boundaries(message, intent, rou
         "테이블 목록 보여줘",
         "데이터베이스 프로시저 조회해줘",
         "프로시저 목록 보여줘",
+        "모든 컬럼 조회해줘",
+        "테이블들 조회해줘",
+        "프로시저들 보여줘",
+        "전체 데이터베이스 객체 검색해줘",
     ],
 )
 def test_g05_general_chat_is_blocked_without_downstream_side_effects(message):

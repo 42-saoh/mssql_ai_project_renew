@@ -82,6 +82,10 @@ def test_domain_guard_blocks_general_chat_before_pgpt_or_runner():
         "데이터베이스 프로시저 조회해줘",
         "프로시저 목록 보여줘",
         "테이블 메타데이터 보여줘",
+        "모든 컬럼 조회해줘",
+        "테이블들 조회해줘",
+        "프로시저들 보여줘",
+        "전체 데이터베이스 객체 검색해줘",
     ],
 )
 def test_domain_guard_blocks_db_themed_general_chat_before_pgpt_or_runner(message):
