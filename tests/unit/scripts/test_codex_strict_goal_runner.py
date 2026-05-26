@@ -218,6 +218,25 @@ def test_execute_prompt_includes_last_failed_retry_context(tmp_path):
     assert "Do not edit later goal files" in prompt
     assert "Stage gates:" in prompt
     assert "Outer validation gates run only at stage boundaries G02, G07, G10, and G12" in prompt
+    assert "Repository environment policy:" in prompt
+    assert "Do not read, print, summarize, copy, move, delete, commit, or persist `.env` values." in prompt
+    assert "Do not treat root `.env` existence as a goal failure." in prompt
+
+
+def test_all_codex_prompts_allow_ignored_env_without_exposing_values(tmp_path):
+    workspace = tmp_path
+    goals = [workspace / "goals" / f"G{i:02d}-goal.md" for i in range(3)]
+
+    prompts = [
+        runner.build_execute_prompt(goals[0], goals, 0, workspace, None),
+        runner.build_verify_prompt(goals[1], goals, 1, workspace),
+        runner.build_stage_verify_prompt("Foundation Complete", goals[2], goals, workspace),
+    ]
+
+    for prompt in prompts:
+        assert "A root `.env` may exist as an ignored local runtime input" in prompt
+        assert "Do not read, print, summarize, copy, move, delete, commit, or persist `.env` values." in prompt
+        assert "Let existing tooling use it indirectly when needed" in prompt
 
 
 def test_execute_prompt_requires_concrete_repair_for_stage_gate_rollback(tmp_path):

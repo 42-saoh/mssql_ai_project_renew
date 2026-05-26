@@ -26,10 +26,10 @@ PLF DB Agent V2 is a greenfield implementation. Legacy code is reference-only. D
 - Service Codex Runner returns proposals only.
 - Validation gate controls artifact persistence.
 - No row data, SP execution, DDL/DML apply, source apply, deploy, raw prompt/provider storage.
-- If a root `.env` is found during G00 execution, quarantine it without reading,
-  printing, committing, or copying its contents. Move it to an ignored location
-  outside the repository, then verify `.env.example` remains the only
-  environment contract in the Development Codex workspace.
+- A root `.env` may exist for local development validation, test connections,
+  and runtime configuration. Development Codex may allow existing tooling to use
+  it indirectly, but must not read, print, summarize, copy, move, delete,
+  commit, or persist its values.
 
 ## Files to create or modify
 
@@ -40,9 +40,9 @@ See the phase plan in `docs/release/v2-implementation-plan.md` after G12, or the
 - Required deliverables exist.
 - Tests for this phase pass.
 - No hard fail condition from `EVAL_SPEC.md` is introduced.
-- Root `.env` is not persisted in the Development Codex workspace; `.env.example`
-  remains the only repository environment contract and must keep secret values
-  blank or placeholder-only.
+- Root `.env`, if present, remains an ignored local runtime input only; its
+  existence is not a goal failure. `.env.example` remains the only repository
+  environment contract and must keep secret values blank or placeholder-only.
 - Stored procedure execution requests, including run/call/exec procedure forms
   in English and Korean, including Korean object-particle forms, hard-block
   before metadata gateway, runner submission, artifact persistence, or approval
@@ -51,8 +51,7 @@ See the phase plan in `docs/release/v2-implementation-plan.md` after G12, or the
 ## Validation commands
 
 ```powershell
-if (Test-Path -LiteralPath .env) { throw "root .env must not exist" }
-python -m pytest tests/security/test_g00_legacy_freeze_boundary.py::test_root_env_file_is_not_persisted_as_development_contract -q
+python -m pytest tests/security/test_g00_legacy_freeze_boundary.py::test_root_env_file_is_ignored_local_runtime_input_not_contract -q
 ```
 
 ```bash

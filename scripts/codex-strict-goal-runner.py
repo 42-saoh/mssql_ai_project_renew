@@ -92,6 +92,13 @@ RESULT_SCHEMA: Dict[str, Any] = {
     "additionalProperties": False,
 }
 
+ENV_FILE_POLICY = """
+Repository environment policy:
+- A root `.env` may exist as an ignored local runtime input for validation, test connections, and app/tool configuration.
+- Do not read, print, summarize, copy, move, delete, commit, or persist `.env` values.
+- Do not treat root `.env` existence as a goal failure. Let existing tooling use it indirectly when needed, and report only sanitized pass/fail diagnostics.
+""".strip()
+
 
 def now_stamp() -> str:
     return dt.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -720,6 +727,8 @@ Previous goal files that must remain fully satisfied:
 Current retry context from the most recent failed verifier or execution:
 {retry_context}
 
+{ENV_FILE_POLICY}
+
 Hard rules:
 1. Execute exactly the current goal file: {current_rel}.
 2. Do NOT execute any later goal file.
@@ -757,6 +766,8 @@ Goal index: {index:02d}
 Previous goals that must also remain compatible:
 {previous}
 
+{ENV_FILE_POLICY}
+
 Hard rules:
 1. Do not modify files.
 2. Read the goal file and inspect the repository state.
@@ -792,6 +803,8 @@ Stage definitions:
 
 Goal files included in this stage validation:
 {included}
+
+{ENV_FILE_POLICY}
 
 Hard rules:
 1. Do not modify files.

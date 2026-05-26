@@ -36,6 +36,8 @@ def test_service_runtime_does_not_take_legacy_reference_docs_as_runtime_instruct
                 assert forbidden not in text
 
 
-def test_root_env_file_is_not_persisted_as_development_contract():
-    assert not (ROOT / ".env").exists()
+def test_root_env_file_is_ignored_local_runtime_input_not_contract():
+    gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+    assert ".env" in {line.strip() for line in gitignore}
     assert (ROOT / ".env.example").exists()
