@@ -25,9 +25,18 @@ def test_db_themed_general_chat_is_not_metadata_search():
     assert classify_intent("List database procedures") == Intent.BLOCKED
     assert classify_intent("Describe SQL metadata") == Intent.BLOCKED
     assert classify_intent("Get procedure metadata") == Intent.BLOCKED
+    assert classify_intent("데이터베이스 테이블 보여줘") == Intent.BLOCKED
+    assert classify_intent("테이블 목록 보여줘") == Intent.BLOCKED
+    assert classify_intent("데이터베이스 프로시저 조회해줘") == Intent.BLOCKED
+    assert classify_intent("프로시저 목록 보여줘") == Intent.BLOCKED
+    assert classify_intent("테이블 메타데이터 보여줘") == Intent.BLOCKED
+    assert classify_intent("모든 테이블들 조회해줘") == Intent.BLOCKED
+    assert classify_intent("저장 프로시저 전부 보여줘") == Intent.BLOCKED
 
 
 def test_concrete_metadata_lookup_shape_is_still_supported():
     assert classify_intent("Find order table metadata") == Intent.METADATA_SEARCH
     assert classify_intent("Find metadata for the order_id column") == Intent.METADATA_SEARCH
     assert classify_intent("Find metadata for dbo.Customer") == Intent.METADATA_SEARCH
+    assert classify_intent("주문 테이블 메타데이터 조회해줘") == Intent.METADATA_SEARCH
+    assert classify_intent("고객테이블 컬럼 찾아줘") == Intent.METADATA_SEARCH

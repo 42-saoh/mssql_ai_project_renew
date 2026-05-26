@@ -76,6 +76,10 @@ def test_hard_blocked_chat_has_checkpoint_without_downstream_side_effects():
         "Describe table metadata",
         "Show me database tables",
         "List database procedures",
+        "데이터베이스 테이블 보여줘",
+        "테이블 목록 보여줘",
+        "데이터베이스 프로시저 조회해줘",
+        "프로시저 목록 보여줘",
     ],
 )
 def test_db_themed_general_chat_has_no_downstream_side_effects(monkeypatch, message):

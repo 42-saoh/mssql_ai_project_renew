@@ -82,6 +82,10 @@ def test_g05_supported_intents_route_to_expected_boundaries(message, intent, rou
         "Describe table metadata",
         "Show me database tables",
         "List database procedures",
+        "데이터베이스 테이블 보여줘",
+        "테이블 목록 보여줘",
+        "데이터베이스 프로시저 조회해줘",
+        "프로시저 목록 보여줘",
     ],
 )
 def test_g05_general_chat_is_blocked_without_downstream_side_effects(message):

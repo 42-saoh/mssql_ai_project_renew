@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from typing import Any
 
 from .java_mybatis_validator import JAVA_MYBATIS_SUFFIX_BY_ARTIFACT_TYPE, validate_java_mybatis_artifact
@@ -58,9 +59,12 @@ FORBIDDEN_OUTPUT_PATTERNS = [
 ]
 
 
-def validate_runtime_result(result: dict[str, Any]) -> tuple[bool, list[str]]:
+def validate_runtime_result(result: Any) -> tuple[bool, list[str]]:
     blockers: list[str] = []
     blockers.extend(validate_runner_result_schema(result))
+    if not isinstance(result, Mapping):
+        blockers = _dedupe(blockers or ["RUNNER_RESULT_SCHEMA_INVALID"])
+        return (False, blockers)
 
     if result.get("productionReady") is not False:
         blockers.append("PRODUCTION_READY_TRUE_BLOCKED")
@@ -71,8 +75,15 @@ def validate_runtime_result(result: dict[str, Any]) -> tuple[bool, list[str]]:
     if any(pattern.search(text) for pattern in FORBIDDEN_OUTPUT_PATTERNS):
         blockers.append("EXECUTABLE_APPLY_INSTRUCTION")
 
-    for artifact in result.get("artifactProposals", []):
+    artifact_proposals = result.get("artifactProposals", [])
+    if not isinstance(artifact_proposals, list):
+        blockers = _dedupe(blockers)
+        return (not blockers, blockers)
+
+    for artifact in artifact_proposals:
         blockers.extend(validate_artifact_proposal_schema(artifact))
+        if not isinstance(artifact, Mapping):
+            continue
         artifact_type = artifact.get("artifactType")
         if artifact_type in RETIRED_ARTIFACT_TYPES:
             blockers.append(f"RETIRED_ARTIFACT_TYPE:{artifact_type}")

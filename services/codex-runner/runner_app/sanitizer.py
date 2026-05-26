@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from plf_agent_validation.redaction_validator import find_redaction_violations
@@ -52,24 +53,39 @@ _NO_DETAIL_PREFIXES = {
 }
 
 
-def sanitize_result(result: dict[str, Any], request: dict[str, Any] | None = None) -> tuple[dict[str, Any], list[str]]:
+def sanitize_result(result: Any, request: dict[str, Any] | None = None) -> tuple[dict[str, Any], list[str]]:
     text = json.dumps(result, ensure_ascii=False, default=str)
     violations = find_redaction_violations(text)
-    if violations:
-        return safe_blocked_result(request, violations), violations
+    shape_blockers = _result_shape_blockers(result)
+    if violations or shape_blockers:
+        blockers = [*shape_blockers, *violations]
+        return safe_blocked_result(request, blockers), blockers
     sanitized = dict(result)
-    sanitized["blockers"] = safe_blocker_codes(list(sanitized.get("blockers") or []))
+    sanitized["blockers"] = safe_blocker_codes(sanitized.get("blockers"))
     return sanitized, violations
+
+
+def _result_shape_blockers(result: Any) -> list[str]:
+    if not isinstance(result, Mapping):
+        return ["RUNNER_RESULT_SCHEMA_INVALID"]
+    blockers: list[str] = []
+    if "artifactProposals" in result:
+        proposals = result.get("artifactProposals")
+        if not isinstance(proposals, list) or any(not isinstance(item, Mapping) for item in proposals):
+            blockers.append("RUNNER_RESULT_SCHEMA_INVALID")
+    if "validation" in result and not isinstance(result.get("validation"), Mapping):
+        blockers.append("RUNNER_RESULT_SCHEMA_INVALID")
+    return _dedupe(blockers)
 
 
 def safe_blocked_result(
     request: dict[str, Any] | None,
-    blockers: list[str],
+    blockers: Any,
     *,
     validation: dict[str, bool] | None = None,
     runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    request = request or {}
+    request = request if isinstance(request, Mapping) else {}
     run_type = request.get("runType")
     if run_type not in ALLOWED_RUN_TYPES:
         run_type = "SP_ANALYSIS"
@@ -96,7 +112,7 @@ def safe_blocked_result(
     return result
 
 
-def _safe_target_key(request: dict[str, Any]) -> str:
+def _safe_target_key(request: Mapping[str, Any]) -> str:
     target = request.get("target") if isinstance(request.get("target"), dict) else {}
     for candidate in (request.get("targetKey"), target.get("targetKey")):
         value = str(candidate or "").strip()
@@ -109,8 +125,20 @@ def _is_safe_target_key(value: str) -> bool:
     return bool(value and _SAFE_TARGET_KEY.fullmatch(value) and not find_redaction_violations(value))
 
 
-def safe_blocker_codes(blockers: list[str]) -> list[str]:
-    return _dedupe([_safe_blocker_code(blocker) for blocker in blockers] or ["RUNNER_BLOCKED"])
+def safe_blocker_codes(blockers: Any) -> list[str]:
+    return _dedupe([_safe_blocker_code(blocker) for blocker in _blocker_values(blockers)] or ["RUNNER_BLOCKED"])
+
+
+def _blocker_values(blockers: Any) -> list[Any]:
+    if blockers is None:
+        return []
+    if isinstance(blockers, str):
+        return [blockers]
+    if isinstance(blockers, Mapping):
+        return list(blockers.keys()) or ["RUNNER_BLOCKED"]
+    if isinstance(blockers, Iterable):
+        return list(blockers)
+    return [blockers]
 
 
 def _safe_blocker_code(blocker: Any) -> str:

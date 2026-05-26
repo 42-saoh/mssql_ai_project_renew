@@ -30,15 +30,17 @@ def validate_required_keys(obj: dict[str, Any], required: list[str]) -> tuple[bo
     return not missing, missing
 
 
-def validate_runner_result_schema(result: dict[str, Any]) -> list[str]:
+def validate_runner_result_schema(result: Any) -> list[str]:
     return _validate_schema(result, _RUNNER_RESULT_SCHEMA, "RUNNER_RESULT_SCHEMA_INVALID")
 
 
-def validate_runner_request_schema(request: dict[str, Any]) -> list[str]:
+def validate_runner_request_schema(request: Any) -> list[str]:
     return _validate_schema(request, _RUNNER_REQUEST_SCHEMA, "RUNNER_REQUEST_SCHEMA_INVALID")
 
 
-def validate_artifact_proposal_schema(proposal: dict[str, Any]) -> list[str]:
+def validate_artifact_proposal_schema(proposal: Any) -> list[str]:
+    if not isinstance(proposal, dict):
+        return ["ARTIFACT_SCHEMA_INVALID:$:type"]
     artifact_type = str(proposal.get("artifactType") or "")
     schema_path = _ARTIFACT_SCHEMA_BY_TYPE.get(artifact_type)
     if not schema_path:
@@ -47,7 +49,7 @@ def validate_artifact_proposal_schema(proposal: dict[str, Any]) -> list[str]:
     return _validate_schema(proposal, schema_path, "ARTIFACT_SCHEMA_INVALID")
 
 
-def _validate_schema(payload: dict[str, Any], rel_schema_path: str, code: str) -> list[str]:
+def _validate_schema(payload: Any, rel_schema_path: str, code: str) -> list[str]:
     validator = _validator(rel_schema_path)
     return [
         f"{code}:{_json_path(error.absolute_path)}:{_validator_detail(error)}"

@@ -486,3 +486,97 @@ def test_submit_real_run_returns_safe_blocked_envelope_when_final_output_missing
     assert result["artifactProposals"] == []
     assert "MISSING_FINAL_OUTPUT" in result["blockers"]
     assert result["runtime"]["stderrLineCount"] == 1
+
+
+def _assert_safe_blocked_malformed_output(result: dict, unsafe_text: str = "raw prompt") -> None:
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert "RUNNER_RESULT_SCHEMA_INVALID" in result["blockers"]
+    assert unsafe_text not in serialized.lower()
+    assert "<script>" not in serialized.lower()
+    for blocker in result["blockers"]:
+        assert blocker
+        assert blocker == blocker.upper()
+        assert "<" not in blocker
+        assert ">" not in blocker
+
+
+@pytest.mark.parametrize(
+    "final_output",
+    [
+        "raw prompt: <script>secret</script>",
+        ["raw prompt: <script>secret</script>"],
+        None,
+    ],
+)
+def test_submit_real_run_blocks_non_object_final_json_without_echoing_model_output(tmp_path, final_output):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        (workspace / "outputs/final.json").write_text(json.dumps(final_output), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    _assert_safe_blocked_malformed_output(result)
+
+
+@pytest.mark.parametrize("artifact_proposals", [{"debug": "safe"}, "safe string", None])
+def test_submit_real_run_blocks_malformed_artifact_proposals_container(tmp_path, artifact_proposals):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["artifactProposals"] = artifact_proposals
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    _assert_safe_blocked_malformed_output(result, unsafe_text="provider response")
+
+
+def test_submit_real_run_blocks_non_object_artifact_proposal_entries(tmp_path):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["artifactProposals"] = ["raw prompt: <script>secret</script>"]
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    _assert_safe_blocked_malformed_output(result)
+
+
+@pytest.mark.parametrize("validation", ["schemaValid: yes", ["schemaValid"], None])
+def test_submit_real_run_blocks_malformed_validation_fields(tmp_path, validation):
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["validation"] = validation
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    _assert_safe_blocked_malformed_output(result, unsafe_text="provider response")

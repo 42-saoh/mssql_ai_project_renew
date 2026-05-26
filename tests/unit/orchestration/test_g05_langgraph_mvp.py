@@ -77,6 +77,11 @@ def test_domain_guard_blocks_general_chat_before_pgpt_or_runner():
         "List database procedures",
         "Describe SQL metadata",
         "Get procedure metadata",
+        "데이터베이스 테이블 보여줘",
+        "테이블 목록 보여줘",
+        "데이터베이스 프로시저 조회해줘",
+        "프로시저 목록 보여줘",
+        "테이블 메타데이터 보여줘",
     ],
 )
 def test_domain_guard_blocks_db_themed_general_chat_before_pgpt_or_runner(message):

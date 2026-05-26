@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -15,7 +16,7 @@ FAILED_OR_BLOCKED_STATUSES = {"FAILED", "BLOCKED"}
 
 
 def validate_result(
-    result: dict,
+    result: Any,
     *,
     output_schema: str | Path | None = None,
     schema_root: str | Path | None = None,
@@ -25,13 +26,23 @@ def validate_result(
 
 
 def validation_flags(
-    result: dict,
+    result: Any,
     *,
     output_schema: str | Path | None = None,
     schema_root: str | Path | None = None,
 ) -> tuple[dict[str, bool], list[str]]:
     schema_blockers = validate_runner_result_schema(result)
     schema_blockers.extend(_validate_runtime_output_schema(result, output_schema, schema_root))
+    if not isinstance(result, Mapping):
+        blockers = _dedupe(schema_blockers or ["RUNNER_RESULT_SCHEMA_INVALID"])
+        return (
+            {
+                "schemaValid": False,
+                "policyValid": False,
+                "staticValidationPassed": False,
+            },
+            blockers,
+        )
     ok, blockers = validate_runtime_result(result)
     status_blockers = _validate_status_artifact_consistency(result)
     status_blockers.extend(_validate_failed_or_blocked_status(result))
@@ -50,16 +61,17 @@ def validation_flags(
 
 
 def mark_validated(
-    result: dict,
+    result: Any,
     *,
     output_schema: str | Path | None = None,
     schema_root: str | Path | None = None,
 ) -> tuple[dict, list[str]]:
     flags, blockers = validation_flags(result, output_schema=output_schema, schema_root=schema_root)
-    validated = dict(result)
-    existing_blockers = list(validated.get("blockers") or [])
+    validated = dict(result) if isinstance(result, Mapping) else {}
+    existing_blockers = _as_list(validated.get("blockers"))
     validated["blockers"] = _dedupe(existing_blockers + blockers)
-    validation = dict(validated.get("validation") or {})
+    validation_value = validated.get("validation")
+    validation = dict(validation_value) if isinstance(validation_value, Mapping) else {}
     validation.update(flags)
     validated["validation"] = validation
     if blockers:
@@ -81,7 +93,7 @@ def _validate_failed_or_blocked_status(result: dict[str, Any]) -> list[str]:
 
 
 def _validate_runtime_output_schema(
-    result: dict[str, Any],
+    result: Any,
     output_schema: str | Path | None,
     schema_root: str | Path | None,
 ) -> list[str]:
@@ -149,3 +161,13 @@ def _dedupe(items: list[str]) -> list[str]:
             seen.add(item)
             deduped.append(item)
     return deduped
+
+
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, (tuple, set)):
+        return list(value)
+    return [value]
