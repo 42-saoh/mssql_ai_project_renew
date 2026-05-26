@@ -99,9 +99,17 @@ def test_metadata_tools_route_filters_external_catalog(monkeypatch):
     assert body["policy"]["filteredToolCount"] == 2
 
 
-def test_metadata_search_route_fails_closed_when_external_success_omits_ok(monkeypatch):
+@pytest.mark.parametrize(
+    "external_response",
+    [
+        {"toolName": "search_metadata_objects", "data": {"items": []}},
+        {"ok": "true", "toolName": "search_metadata_objects", "data": {"items": []}},
+        {"ok": 1, "toolName": "search_metadata_objects", "data": {"items": []}},
+    ],
+)
+def test_metadata_search_route_fails_closed_when_external_success_ok_is_not_true(monkeypatch, external_response):
     def transport(method, path, payload):
-        return {"toolName": "search_metadata_objects", "data": {"items": []}}
+        return external_response
 
     monkeypatch.setattr(
         metadata_service,
@@ -153,3 +161,26 @@ def test_metadata_tool_invoke_route_normalizes_external_error_envelope(monkeypat
             "details": {"retryable": False},
         },
     }
+
+
+def test_metadata_tool_invoke_route_fails_closed_on_malformed_external_error(monkeypatch):
+    def transport(method, path, payload):
+        return {"ok": False, "toolName": "get_table_schema", "diagnostics": "safe but malformed"}
+
+    monkeypatch.setattr(
+        metadata_service,
+        "get_mssql_mcp_client",
+        lambda: MssqlMcpClient(transport=transport),
+    )
+
+    response = TestClient(create_app()).post(
+        "/api/v1/metadata/tools/get_table_schema/invoke",
+        json={"arguments": {"dbProfileId": "master", "schema": "dbo", "tableName": "TB_ORDER"}},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "MCP_INVALID_RESPONSE"
+    assert "toolName" not in body
+    assert "diagnostics" not in body
