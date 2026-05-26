@@ -68,7 +68,16 @@ def test_hard_blocked_chat_has_checkpoint_without_downstream_side_effects():
     assert artifact_repository.list_all() == []
 
 
-@pytest.mark.parametrize("message", ["What is SQL?", "Explain databases"])
+@pytest.mark.parametrize(
+    "message",
+    [
+        "What is SQL?",
+        "Explain databases",
+        "Describe table metadata",
+        "Show me database tables",
+        "List database procedures",
+    ],
+)
 def test_db_themed_general_chat_has_no_downstream_side_effects(monkeypatch, message):
     _clear_repositories()
 

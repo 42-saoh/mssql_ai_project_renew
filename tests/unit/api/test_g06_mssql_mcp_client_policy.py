@@ -202,6 +202,98 @@ def test_tool_success_response_must_match_requested_tool_name():
 
 
 @pytest.mark.parametrize(
+    "response",
+    [
+        {"toolName": "search_metadata_objects", "data": {"items": []}},
+        {"ok": "true", "toolName": "search_metadata_objects", "data": {"items": []}},
+        {"ok": 1, "toolName": "search_metadata_objects", "data": {"items": []}},
+    ],
+)
+def test_tool_success_response_requires_ok_true(response):
+    def transport(method, path, payload):
+        return response
+
+    with pytest.raises(MssqlMcpClientError) as exc_info:
+        MssqlMcpClient(transport=transport).invoke_tool(
+            "search_metadata_objects",
+            {"dbProfileId": "master", "query": "order"},
+        )
+
+    assert exc_info.value.code == "MCP_INVALID_RESPONSE"
+    safe_response = exc_info.value.to_response()
+    assert safe_response["ok"] is False
+    assert safe_response["error"]["code"] == "MCP_INVALID_RESPONSE"
+    assert "toolName" not in safe_response
+    assert "data" not in safe_response
+
+
+def test_external_error_response_is_normalized_to_safe_error_envelope():
+    def transport(method, path, payload):
+        return {
+            "ok": False,
+            "toolName": "search_metadata_objects",
+            "data": {"ignored": True},
+            "diagnostics": "safe external diagnostic",
+            "error": {
+                "code": "NOT_FOUND",
+                "message": "Object was not found.",
+                "details": {"retryable": False},
+                "extra": "ignored",
+            },
+        }
+
+    response = MssqlMcpClient(transport=transport).invoke_tool(
+        "search_metadata_objects",
+        {"dbProfileId": "master", "query": "order"},
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "NOT_FOUND",
+            "message": "Object was not found.",
+            "details": {"retryable": False},
+        },
+    }
+
+
+def test_malformed_external_error_response_gets_default_safe_code_and_message():
+    def transport(method, path, payload):
+        return {
+            "ok": False,
+            "toolName": "search_metadata_objects",
+            "error": {"details": {"reason": "timeout"}},
+        }
+
+    response = MssqlMcpClient(transport=transport).invoke_tool(
+        "search_metadata_objects",
+        {"dbProfileId": "master", "query": "order"},
+    )
+
+    assert response == {
+        "ok": False,
+        "error": {
+            "code": "MCP_EXTERNAL_ERROR",
+            "message": "External MSSQL MCP returned an error response.",
+            "details": {"reason": "timeout"},
+        },
+    }
+
+
+def test_external_error_response_without_error_object_fails_closed():
+    def transport(method, path, payload):
+        return {"ok": False, "toolName": "search_metadata_objects"}
+
+    with pytest.raises(MssqlMcpClientError) as exc_info:
+        MssqlMcpClient(transport=transport).invoke_tool(
+            "search_metadata_objects",
+            {"dbProfileId": "master", "query": "order"},
+        )
+
+    assert exc_info.value.code == "MCP_INVALID_RESPONSE"
+
+
+@pytest.mark.parametrize(
     ("response", "violation"),
     [
         ({"ok": True, "toolName": "search_metadata_objects", "data": {"sample": "select * from users"}}, "ROW_DATA"),

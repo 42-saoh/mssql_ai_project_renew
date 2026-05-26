@@ -39,10 +39,14 @@ def test_g05_contract_preserves_policy_and_checkpoint_boundaries():
     assert spec["domainGuard"]["blocksGeneralChat"] is True
     assert spec["domainGuard"]["pgptMayNotAnswerGeneralChat"] is True
     assert spec["domainGuard"]["requiresSupportedActionOrLookupShape"] is True
+    assert spec["domainGuard"]["metadataSearchRequiresConcreteTarget"] is True
     assert {
         "What is SQL?",
         "Explain databases",
         "What is a column?",
+        "Describe table metadata",
+        "Show me database tables",
+        "List database procedures",
     } <= set(spec["domainGuard"]["dbThemedGeneralChatBlockedExamples"])
     assert spec["policyGate"]["blockedRequestsDoNotCallPgpt"] is True
     assert spec["policyGate"]["blockedRequestsDoNotSubmitRunner"] is True

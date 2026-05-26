@@ -21,10 +21,14 @@ domainGuard:
   blocksGeneralChat: true
   pgptMayNotAnswerGeneralChat: true
   requiresSupportedActionOrLookupShape: true
+  metadataSearchRequiresConcreteTarget: true
   dbThemedGeneralChatBlockedExamples:
     - What is SQL?
     - Explain databases
     - What is a column?
+    - Describe table metadata
+    - Show me database tables
+    - List database procedures
   allowedDbIntents:
     - SP_ANALYSIS
     - METADATA_SEARCH

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from plf_agent_contracts.enums import Intent
 
 from .forbidden_operations import detect_forbidden_operation_blockers
@@ -71,6 +73,50 @@ METADATA_OBJECT_TERMS = [
     "프로시저",
 ]
 
+_METADATA_DOTTED_OBJECT_PATTERN = re.compile(
+    r"\b(?:[a-z][a-z0-9_-]{0,63}\.){1,2}[a-z_][a-z0-9_$#@]{1,127}\b"
+)
+_METADATA_WORD_PATTERN = re.compile(r"\b[a-z][a-z0-9_$#@_-]{2,}\b")
+_METADATA_GENERIC_TERMS = {
+    "about",
+    "all",
+    "any",
+    "column",
+    "columns",
+    "database",
+    "databases",
+    "db",
+    "describe",
+    "detail",
+    "details",
+    "find",
+    "for",
+    "from",
+    "get",
+    "information",
+    "info",
+    "list",
+    "locate",
+    "look",
+    "lookup",
+    "me",
+    "metadata",
+    "object",
+    "objects",
+    "please",
+    "procedure",
+    "procedures",
+    "schema",
+    "schemas",
+    "search",
+    "show",
+    "sql",
+    "table",
+    "tables",
+    "the",
+    "up",
+}
+
 
 def classify_intent(message: str) -> Intent:
     text = (message or "").lower()
@@ -126,4 +172,17 @@ def classify_intent(message: str) -> Intent:
 def _looks_like_metadata_search(text: str) -> bool:
     has_lookup_action = any(action in text for action in METADATA_ACTION_TERMS)
     has_metadata_object = any(term in text for term in METADATA_OBJECT_TERMS)
-    return has_lookup_action and has_metadata_object
+    if not (has_lookup_action and has_metadata_object):
+        return False
+    if _has_concrete_metadata_lookup_target(text):
+        return True
+    return any(ord(character) > 127 for character in text)
+
+
+def _has_concrete_metadata_lookup_target(text: str) -> bool:
+    if _METADATA_DOTTED_OBJECT_PATTERN.search(text):
+        return True
+    return any(
+        word not in _METADATA_GENERIC_TERMS
+        for word in _METADATA_WORD_PATTERN.findall(text)
+    )

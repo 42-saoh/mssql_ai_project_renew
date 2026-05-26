@@ -232,7 +232,13 @@ class MssqlMcpClient:
 
     def _validate_tool_response(self, requested_tool_name: str, response: dict[str, Any]) -> dict[str, Any]:
         if response.get("ok") is False:
-            return response
+            return _normalize_external_error_response(response)
+        if response.get("ok") is not True:
+            raise MssqlMcpClientError(
+                "MCP_INVALID_RESPONSE",
+                "External MSSQL MCP success response must set ok true.",
+                details={"toolName": _safe_tool_name_for_diagnostics(requested_tool_name)},
+            )
         response_tool_name = response.get("toolName")
         if not isinstance(response_tool_name, str):
             raise MssqlMcpClientError(
@@ -361,6 +367,44 @@ def get_mssql_mcp_client() -> MssqlMcpClient:
     return MssqlMcpClient(
         base_url=os.getenv("PLF_METADATA_GATEWAY_URL", DEFAULT_METADATA_GATEWAY_URL),
     )
+
+
+def _normalize_external_error_response(response: dict[str, Any]) -> dict[str, Any]:
+    error = response.get("error")
+    if not isinstance(error, dict):
+        raise MssqlMcpClientError(
+            "MCP_INVALID_RESPONSE",
+            "External MSSQL MCP error response must include an error object.",
+        )
+
+    raw_code = error.get("code")
+    raw_message = error.get("message")
+    code = raw_code.strip() if isinstance(raw_code, str) and raw_code.strip() else "MCP_EXTERNAL_ERROR"
+    message = (
+        raw_message.strip()
+        if isinstance(raw_message, str) and raw_message.strip()
+        else "External MSSQL MCP returned an error response."
+    )
+
+    normalized: dict[str, Any] = {
+        "ok": False,
+        "error": {
+            "code": code,
+            "message": message,
+        },
+    }
+    details = error.get("details")
+    if isinstance(details, dict) and details:
+        normalized["error"]["details"] = details
+
+    violations = _safe_payload_violations(normalized)
+    if violations:
+        raise MssqlMcpClientError(
+            "MCP_RESPONSE_BLOCKED",
+            "External MSSQL MCP error response contained content blocked by platform read-only policy.",
+            details={"violations": violations},
+        )
+    return normalized
 
 
 def _metadata_search_arguments(query: str, *, db_profile_id: str, limit: int) -> dict[str, Any]:

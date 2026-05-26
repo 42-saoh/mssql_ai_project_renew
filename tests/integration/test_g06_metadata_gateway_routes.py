@@ -97,3 +97,59 @@ def test_metadata_tools_route_filters_external_catalog(monkeypatch):
     body = response.json()
     assert [tool["name"] for tool in body["tools"]] == ["search_metadata_objects"]
     assert body["policy"]["filteredToolCount"] == 2
+
+
+def test_metadata_search_route_fails_closed_when_external_success_omits_ok(monkeypatch):
+    def transport(method, path, payload):
+        return {"toolName": "search_metadata_objects", "data": {"items": []}}
+
+    monkeypatch.setattr(
+        metadata_service,
+        "get_mssql_mcp_client",
+        lambda: MssqlMcpClient(transport=transport),
+    )
+
+    response = TestClient(create_app()).get("/api/v1/metadata/search", params={"q": "order"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "MCP_INVALID_RESPONSE"
+    assert "toolName" not in body
+    assert "data" not in body
+
+
+def test_metadata_tool_invoke_route_normalizes_external_error_envelope(monkeypatch):
+    def transport(method, path, payload):
+        return {
+            "ok": False,
+            "toolName": "get_table_schema",
+            "data": {"ignored": True},
+            "error": {
+                "code": "NOT_FOUND",
+                "message": "Object was not found.",
+                "details": {"retryable": False},
+                "extra": "ignored",
+            },
+        }
+
+    monkeypatch.setattr(
+        metadata_service,
+        "get_mssql_mcp_client",
+        lambda: MssqlMcpClient(transport=transport),
+    )
+
+    response = TestClient(create_app()).post(
+        "/api/v1/metadata/tools/get_table_schema/invoke",
+        json={"arguments": {"dbProfileId": "master", "schema": "dbo", "tableName": "TB_ORDER"}},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": False,
+        "error": {
+            "code": "NOT_FOUND",
+            "message": "Object was not found.",
+            "details": {"retryable": False},
+        },
+    }

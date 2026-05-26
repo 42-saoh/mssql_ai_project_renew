@@ -72,6 +72,11 @@ def test_domain_guard_blocks_general_chat_before_pgpt_or_runner():
         "Explain databases",
         "What is a column?",
         "Explain table metadata",
+        "Describe table metadata",
+        "Show me database tables",
+        "List database procedures",
+        "Describe SQL metadata",
+        "Get procedure metadata",
     ],
 )
 def test_domain_guard_blocks_db_themed_general_chat_before_pgpt_or_runner(message):

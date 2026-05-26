@@ -20,3 +20,14 @@ def test_db_themed_general_chat_is_not_metadata_search():
     assert classify_intent("What is SQL?") == Intent.BLOCKED
     assert classify_intent("Explain databases") == Intent.BLOCKED
     assert classify_intent("What is a column?") == Intent.BLOCKED
+    assert classify_intent("Describe table metadata") == Intent.BLOCKED
+    assert classify_intent("Show me database tables") == Intent.BLOCKED
+    assert classify_intent("List database procedures") == Intent.BLOCKED
+    assert classify_intent("Describe SQL metadata") == Intent.BLOCKED
+    assert classify_intent("Get procedure metadata") == Intent.BLOCKED
+
+
+def test_concrete_metadata_lookup_shape_is_still_supported():
+    assert classify_intent("Find order table metadata") == Intent.METADATA_SEARCH
+    assert classify_intent("Find metadata for the order_id column") == Intent.METADATA_SEARCH
+    assert classify_intent("Find metadata for dbo.Customer") == Intent.METADATA_SEARCH

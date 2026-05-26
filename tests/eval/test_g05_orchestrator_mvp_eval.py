@@ -58,6 +58,9 @@ def test_g05_supported_intents_route_to_expected_boundaries(message, intent, rou
         "Recommend lunch today",
         "What is SQL?",
         "Explain databases",
+        "Describe table metadata",
+        "Show me database tables",
+        "List database procedures",
     ],
 )
 def test_g05_general_chat_is_blocked_without_downstream_side_effects(message):
