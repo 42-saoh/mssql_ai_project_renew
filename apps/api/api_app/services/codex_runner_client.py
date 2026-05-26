@@ -6,12 +6,14 @@ from uuid import uuid4
 from apps.api.api_app.repositories import run_repository
 from apps.api.api_app.services.observability_service import record_observability_event
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist
+from plf_agent_contracts.policy import DEFAULT_RUNTIME_POLICY
 from services.codex_runner.runner_app.fake_runner import run_fake
 
 
 def submit_codex_run(request: dict) -> dict:
     codex_run_id = f"codexrun_{uuid4().hex[:12]}"
     target_key = _target_key(request)
+    policy = _closed_runtime_policy(request)
     fake_result = run_fake(
         {
             "runType": request["runType"],
@@ -35,6 +37,8 @@ def submit_codex_run(request: dict) -> dict:
         "target_schema": target.get("schema"),
         "target_name": target.get("name"),
         "tool_mode": request.get("toolMode", "EVIDENCE_BUNDLE_ONLY"),
+        "runtime_policy_flags_closed": True,
+        "runtime_policy_flag_count": len(policy),
         "skill_allowlist": list(request.get("skillAllowlist", [])),
         "fake_runner_status": fake_result.get("status"),
         "fake_runner_proposal_count": len(fake_result.get("artifactProposals", [])),
@@ -77,3 +81,15 @@ def _now() -> str:
 def _target_key(request: dict) -> str:
     target = request.get("target") if isinstance(request.get("target"), dict) else {}
     return str(request.get("targetKey") or target.get("targetKey") or "unresolved")
+
+
+def _closed_runtime_policy(request: dict) -> dict[str, bool]:
+    policy = request.get("policy")
+    if policy is None:
+        raise ValueError("Codex Runner request policy is required.")
+    if not isinstance(policy, dict):
+        raise ValueError("Codex Runner request policy must be an object.")
+    closed_policy = {key: policy.get(key) for key in DEFAULT_RUNTIME_POLICY}
+    if closed_policy != DEFAULT_RUNTIME_POLICY or set(policy) != set(DEFAULT_RUNTIME_POLICY):
+        raise ValueError("Codex Runner request policy must keep all runtime flags false.")
+    return dict(closed_policy)

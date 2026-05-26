@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from apps.api.api_app.repositories import (
     approval_repository,
     artifact_repository,
@@ -8,6 +10,8 @@ from apps.api.api_app.repositories import (
     validation_repository,
 )
 from apps.api.api_app.services import chat_service
+from apps.api.api_app.services.codex_runner_client import submit_codex_run
+from plf_agent_contracts.policy import DEFAULT_RUNTIME_POLICY
 
 
 def _clear_repositories():
@@ -110,5 +114,38 @@ def test_codex_runner_intent_submits_schema_aware_runtime_request_metadata_only(
     assert codex_run["target_object_type"] == "PROCEDURE"
     assert codex_run["target_schema"] == "dbo"
     assert codex_run["target_name"] == "InvoiceAudit"
+    assert codex_run["runtime_policy_flags_closed"] is True
+    assert codex_run["runtime_policy_flag_count"] == 7
     assert "contentMarkdown" not in str(codex_run)
+    assert artifact_repository.list_all() == []
+
+
+def test_codex_runner_gateway_rejects_open_runtime_policy_before_recording():
+    _clear_repositories()
+    request = {
+        "schemaVersion": "ServiceCodexRunRequest.v1",
+        "runType": "SP_ANALYSIS",
+        "chatRunId": "chatrun_policy",
+        "conversationId": "conv_policy",
+        "target": {
+            "dbProfileId": "master",
+            "objectType": "PROCEDURE",
+            "schema": "dbo",
+            "name": "InvoiceAudit",
+            "targetKey": "master.PROCEDURE.dbo.InvoiceAudit",
+        },
+        "policy": {**DEFAULT_RUNTIME_POLICY, "allowDeploy": True},
+        "toolMode": "EVIDENCE_BUNDLE_ONLY",
+        "skillAllowlist": [
+            "runtime-sp-analysis",
+            "runtime-output-validation",
+            "runtime-policy-review",
+        ],
+        "outputSchema": "schemas/sp_analysis_result.schema.json",
+    }
+
+    with pytest.raises(ValueError, match="runtime flags false"):
+        submit_codex_run(request)
+
+    assert run_repository.list_codex_runs() == []
     assert artifact_repository.list_all() == []
