@@ -39,7 +39,9 @@ def test_g06_allowed_tool_contract_matches_client_and_catalog():
     assert set(catalog["allowedMetadataToolNames"]) == expected
     assert spec["allowedMetadataTools"]["readOnlyOnly"] is True
     assert spec["allowedMetadataTools"]["unknownToolsBlocked"] is True
+    assert spec["allowedMetadataTools"]["toolCatalogSanitizedBeforeUnsafeResponseValidation"] is True
     assert catalog["catalogPolicy"]["requireReadOnlyFlag"] is True
+    assert catalog["catalogPolicy"]["sanitizeCatalogBeforeUnsafeResponseValidation"] is True
     assert catalog["catalogPolicy"]["invokeUnknownToolsAllowed"] is False
 
 

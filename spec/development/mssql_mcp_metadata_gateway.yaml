@@ -26,6 +26,7 @@ allowedMetadataTools:
   readOnlyOnly: true
   unknownToolsBlocked: true
   toolCatalogFiltersBlockedTools: true
+  toolCatalogSanitizedBeforeUnsafeResponseValidation: true
   requiredReadOnlyFlagFromExternalCatalog: true
   names:
     - search_metadata_objects

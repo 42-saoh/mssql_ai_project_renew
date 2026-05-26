@@ -60,6 +60,7 @@ catalogPolicy:
   requireReadOnlyFlag: true
   filterBlockedToolsBeforeReturningToPlatform: true
   filterUnknownToolsBeforeReturningToPlatform: true
+  sanitizeCatalogBeforeUnsafeResponseValidation: true
   invokeUnknownToolsAllowed: false
 
 blockedBeforeProxy:

@@ -456,16 +456,19 @@ def _filter_tool_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
         if tool.get("readOnly") is not True or not is_allowed_metadata_tool_name(name):
             rejected_count += 1
             continue
-        filtered_tool = dict(tool)
-        filtered_tool["name"] = normalize_tool_name(name)
-        filtered_tool["readOnly"] = True
-        filtered.append(filtered_tool)
+        filtered.append(
+            {
+                "name": normalize_tool_name(name),
+                "readOnly": True,
+            }
+        )
 
-    result = dict(catalog)
-    result["tools"] = filtered
-    result["policy"] = {
-        "readOnlyMetadataOnly": True,
-        "allowedToolNames": sorted(ALLOWED_METADATA_TOOL_NAMES),
-        "filteredToolCount": rejected_count,
+    return {
+        "tools": filtered,
+        "policy": {
+            "readOnlyMetadataOnly": True,
+            "catalogSanitizedBeforeResponseValidation": True,
+            "allowedToolNames": sorted(ALLOWED_METADATA_TOOL_NAMES),
+            "filteredToolCount": rejected_count,
+        },
     }
-    return result

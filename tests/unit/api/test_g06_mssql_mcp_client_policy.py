@@ -40,8 +40,13 @@ def test_catalog_filters_to_explicit_readonly_allowlist():
 def test_catalog_filters_blocked_tools_before_unsafe_response_validation():
     def transport(method, path, payload):
         return {
+            "diagnostics": "External catalog includes mssql+pyodbc://user:pwd@prod-sql/ERP but must not leak.",
             "tools": [
-                {"name": "search_metadata_objects", "readOnly": True},
+                {
+                    "name": "search_metadata_objects",
+                    "readOnly": True,
+                    "description": "Read-only metadata search; does not execute SQL or return row data.",
+                },
                 {
                     "name": "execute_sql",
                     "readOnly": False,
@@ -60,9 +65,13 @@ def test_catalog_filters_blocked_tools_before_unsafe_response_validation():
     rendered = str(catalog).lower()
     assert [tool["name"] for tool in catalog["tools"]] == ["search_metadata_objects"]
     assert catalog["policy"]["filteredToolCount"] == 2
+    assert catalog["policy"]["catalogSanitizedBeforeResponseValidation"] is True
     assert "select *" not in rendered
     assert "password" not in rendered
     assert "drop table" not in rendered
+    assert "mssql+pyodbc" not in rendered
+    assert "execute sql" not in rendered
+    assert "row data" not in rendered
 
 
 @pytest.mark.parametrize(
