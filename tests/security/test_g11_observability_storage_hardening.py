@@ -183,6 +183,66 @@ def test_observability_event_rejects_unsupported_raw_fields():
     assert observability_repository.list_all() == []
 
 
+def test_observability_repository_rejects_direct_raw_field_bypass():
+    _clear_repositories()
+
+    with pytest.raises(observability_repository.ObservabilityRepositoryError):
+        observability_repository.put(
+            "obs_direct",
+            {
+                "event_id": "obs_direct",
+                "event_type": "chat_run_recorded",
+                "subject_type": "chat_run",
+                "subject_id": "chatrun_unsafe",
+                "created_at": "2026-01-01T00:00:00Z",
+                "raw_prompt": "show table data",
+            },
+        )
+
+    assert observability_repository.list_all() == []
+
+
+def test_observability_repository_sanitizes_direct_redaction_blocker_codes():
+    _clear_repositories()
+
+    stored = observability_repository.put(
+        "obs_blockers",
+        {
+            "event_id": "obs_blockers",
+            "event_type": "artifact_validation_blocked",
+            "subject_type": "artifact_validation",
+            "subject_id": "validation_1",
+            "created_at": "2026-01-01T00:00:00Z",
+            "blocker_codes": ["RAW_PROMPT", "password=abc", "SAFE_POLICY_CODE"],
+        },
+    )
+
+    assert stored["blocker_codes"] == ["REDACTION_VIOLATION_BLOCKED", "SAFE_POLICY_CODE"]
+    assert "RAW_PROMPT" not in str(observability_repository.list_all())
+    assert "password=abc" not in str(observability_repository.list_all())
+
+
+def test_observability_repository_returns_isolated_event_copies():
+    _clear_repositories()
+
+    stored = observability_repository.put(
+        "obs_copy",
+        {
+            "event_id": "obs_copy",
+            "event_type": "artifact_validation_blocked",
+            "subject_type": "artifact_validation",
+            "subject_id": "validation_1",
+            "created_at": "2026-01-01T00:00:00Z",
+            "blocker_codes": ["SAFE_POLICY_CODE"],
+        },
+    )
+    stored["blocker_codes"].append("RAW_PROMPT")
+
+    listed = observability_repository.list_all()
+
+    assert listed[0]["blocker_codes"] == ["SAFE_POLICY_CODE"]
+
+
 def test_observability_blocker_sanitization_blocks_redaction_codes():
     event = build_observability_event(
         "artifact_validation_blocked",
