@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from plf_agent_validation.redaction_validator import find_redaction_violations
+
 
 @dataclass(frozen=True)
 class ForbiddenOperationRule:
@@ -84,7 +86,13 @@ _RULES = (
 )
 
 _HARD_BLOCKED_CODES = {
+    "CONNECTION_STRING",
+    "RAW_PROMPT",
+    "RAW_PROVIDER_RESPONSE",
+    "RAW_SP",
     "ROW_DATA_ACCESS_BLOCKED",
+    "ROW_DATA",
+    "SECRET",
     "STORED_PROCEDURE_EXECUTION_BLOCKED",
     "FREE_SQL_EXECUTION_BLOCKED",
     "SOURCE_APPLY_OR_DEPLOY_BLOCKED",
@@ -97,6 +105,9 @@ def detect_forbidden_operation_blockers(message: str) -> list[str]:
     for rule in _RULES:
         if any(pattern.search(text) for pattern in rule.patterns):
             blockers.append(rule.code)
+    for code in find_redaction_violations(text):
+        if code not in blockers:
+            blockers.append(code)
     return blockers
 
 

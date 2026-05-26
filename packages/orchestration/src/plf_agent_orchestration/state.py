@@ -3,6 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, TypedDict
 
+from plf_agent_validation.redaction_validator import find_redaction_violations
+
+_REDACTION_BLOCKER_CODES = {
+    "CONNECTION_STRING",
+    "RAW_PROMPT",
+    "RAW_PROVIDER_RESPONSE",
+    "RAW_SP",
+    "ROW_DATA",
+    "SECRET",
+}
+
 
 @dataclass
 class OrchestratorState:
@@ -75,7 +86,7 @@ def safe_checkpoint_from_state(state: Mapping[str, Any]) -> dict[str, Any]:
         "sanitizedMessageSummary": state.get("sanitizedMessageSummary"),
         "intent": state.get("intent"),
         "policyDecision": state.get("policyDecision"),
-        "blockers": list(state.get("blockers", [])),
+        "blockers": _safe_checkpoint_blockers(state.get("blockers", [])),
         "route": state.get("route"),
         "targetKey": state.get("targetKey"),
         "evidenceBundleRef": state.get("evidenceBundleRef"),
@@ -97,3 +108,19 @@ def safe_checkpoint_from_state(state: Mapping[str, Any]) -> dict[str, Any]:
             "mode": runner_request.get("mode", "fake"),
         }
     return checkpoint
+
+
+def _safe_checkpoint_blockers(blockers: object) -> list[str]:
+    safe: list[str] = []
+    if not isinstance(blockers, list):
+        return safe
+    for blocker in blockers:
+        code = str(blocker)
+        safe_code = (
+            "REDACTION_VIOLATION_BLOCKED"
+            if code in _REDACTION_BLOCKER_CODES or find_redaction_violations(code)
+            else code
+        )
+        if safe_code not in safe:
+            safe.append(safe_code)
+    return safe

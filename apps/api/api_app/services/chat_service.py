@@ -42,6 +42,14 @@ _DOTTED_OBJECT_PATTERN = re.compile(
     r"(?P<schema>[A-Za-z_][A-Za-z0-9_$#@]{0,127})\."
     r"(?P<name>[A-Za-z_][A-Za-z0-9_$#@]{0,127})\b"
 )
+_REDACTION_BLOCKER_CODES = {
+    "CONNECTION_STRING",
+    "RAW_PROMPT",
+    "RAW_PROVIDER_RESPONSE",
+    "RAW_SP",
+    "ROW_DATA",
+    "SECRET",
+}
 
 
 def create_chat_run(message: str, *, conversation_id: str | None = None, actor_id: str | None = None) -> dict[str, object]:
@@ -226,10 +234,12 @@ def _safe_blockers(blockers: list[object]) -> list[str]:
     safe: list[str] = []
     for blocker in blockers:
         text = str(blocker)
-        if find_redaction_violations(text):
-            safe.append("REDACTED_POLICY_BLOCKER")
+        if text in _REDACTION_BLOCKER_CODES or find_redaction_violations(text):
+            safe_code = "REDACTION_VIOLATION_BLOCKED"
         else:
-            safe.append(text)
+            safe_code = text
+        if safe_code not in safe:
+            safe.append(safe_code)
     return safe
 
 

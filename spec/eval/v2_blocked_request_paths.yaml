@@ -14,3 +14,5 @@ cases:
     summary: Metadata Gateway blocks unsafe tool names, arguments, and search queries before the external MSSQL MCP transport is called.
   - id: g11_blocked_requests_emit_safe_observability_without_side_effects
     summary: Blocked requests may emit sanitized observability events but must not create approvals, runner submissions, artifacts, DB execution, source apply, or deploy side effects.
+  - id: g11_raw_payload_secret_connection_requests_block_before_side_effects
+    summary: DB-analysis-shaped requests containing raw prompt/provider markers, secrets, or SQL Server connection strings must hard-block before PGPT, Metadata Gateway, Codex Runner, approval, artifact, validation, DB execution, source apply, or deploy side effects.
