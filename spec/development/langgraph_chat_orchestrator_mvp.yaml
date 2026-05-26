@@ -20,6 +20,11 @@ orchestrator:
 domainGuard:
   blocksGeneralChat: true
   pgptMayNotAnswerGeneralChat: true
+  requiresSupportedActionOrLookupShape: true
+  dbThemedGeneralChatBlockedExamples:
+    - What is SQL?
+    - Explain databases
+    - What is a column?
   allowedDbIntents:
     - SP_ANALYSIS
     - METADATA_SEARCH

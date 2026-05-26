@@ -26,7 +26,9 @@ def test_langgraph_orchestrator_routes_allowed_runner_intent_with_safe_checkpoin
     message = "Show dependency information for the order table"
     pgpt = CountingPgpt()
 
-    result = orchestrate_message(message, pgpt_client=pgpt, conversation_id="conv_1", chat_run_id="chatrun_1")
+    result = orchestrate_message(
+        message, pgpt_client=pgpt, conversation_id="conv_1", chat_run_id="chatrun_1"
+    )
 
     assert result["intent"] == "DEPENDENCY_ANALYSIS"
     assert result["policyDecision"] == "ALLOW"
@@ -63,6 +65,30 @@ def test_domain_guard_blocks_general_chat_before_pgpt_or_runner():
     assert pgpt.calls == []
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "What is SQL?",
+        "Explain databases",
+        "What is a column?",
+        "Explain table metadata",
+    ],
+)
+def test_domain_guard_blocks_db_themed_general_chat_before_pgpt_or_runner(message):
+    pgpt = CountingPgpt()
+
+    result = orchestrate_message(message, pgpt_client=pgpt)
+
+    assert result["intent"] == "BLOCKED"
+    assert result["policyDecision"] == "BLOCKED"
+    assert result["route"] == "blocked"
+    assert "OUT_OF_DOMAIN" in result["blockers"]
+    assert result["runnerRequest"] is None
+    assert result["pgptUsed"] is False
+    assert result["pgptFallbackReason"] == "POLICY_BLOCKED_BEFORE_PGPT"
+    assert pgpt.calls == []
+
+
 def test_hard_policy_gate_blocks_stored_procedure_execution_before_pgpt_or_runner():
     pgpt = CountingPgpt()
 
@@ -81,16 +107,30 @@ def test_hard_policy_gate_blocks_stored_procedure_execution_before_pgpt_or_runne
     ("message", "blocker"),
     [
         ("select name from dbo.Customer", "FREE_SQL_EXECUTION_BLOCKED"),
-        ("run query select customer_id from dbo.Customer", "FREE_SQL_EXECUTION_BLOCKED"),
+        (
+            "run query select customer_id from dbo.Customer",
+            "FREE_SQL_EXECUTION_BLOCKED",
+        ),
         ("show customer rows", "ROW_DATA_ACCESS_BLOCKED"),
         ("show customer records", "ROW_DATA_ACCESS_BLOCKED"),
         ("show sample data for dbo.Customer", "ROW_DATA_ACCESS_BLOCKED"),
-        ("\uace0\uac1d \ud589 \ub370\uc774\ud130\ub97c \ubcf4\uc5ec\uc918", "ROW_DATA_ACCESS_BLOCKED"),
-        ("\uace0\uac1d \ub808\ucf54\ub4dc\ub97c \uc870\ud68c\ud574\uc918", "ROW_DATA_ACCESS_BLOCKED"),
-        ("SQL \uc2e4\ud589: select name from dbo.Customer", "FREE_SQL_EXECUTION_BLOCKED"),
+        (
+            "\uace0\uac1d \ud589 \ub370\uc774\ud130\ub97c \ubcf4\uc5ec\uc918",
+            "ROW_DATA_ACCESS_BLOCKED",
+        ),
+        (
+            "\uace0\uac1d \ub808\ucf54\ub4dc\ub97c \uc870\ud68c\ud574\uc918",
+            "ROW_DATA_ACCESS_BLOCKED",
+        ),
+        (
+            "SQL \uc2e4\ud589: select name from dbo.Customer",
+            "FREE_SQL_EXECUTION_BLOCKED",
+        ),
     ],
 )
-def test_hard_policy_gate_blocks_free_sql_and_row_data_before_pgpt_or_runner(message, blocker):
+def test_hard_policy_gate_blocks_free_sql_and_row_data_before_pgpt_or_runner(
+    message, blocker
+):
     pgpt = CountingPgpt()
 
     result = orchestrate_message(message, pgpt_client=pgpt)

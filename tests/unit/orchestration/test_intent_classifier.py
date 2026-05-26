@@ -14,3 +14,9 @@ def test_supported_intents():
 def test_blocked_intents():
     assert classify_intent("이 DDL 적용해줘") == Intent.BLOCKED_OR_APPROVAL_REQUIRED
     assert classify_intent("오늘 점심 추천해줘") == Intent.BLOCKED
+
+
+def test_db_themed_general_chat_is_not_metadata_search():
+    assert classify_intent("What is SQL?") == Intent.BLOCKED
+    assert classify_intent("Explain databases") == Intent.BLOCKED
+    assert classify_intent("What is a column?") == Intent.BLOCKED

@@ -61,6 +61,11 @@ Expected G05 files include:
   PGPT intent assist, route selection, and fake runner request preparation.
 - General chat is blocked before PGPT, metadata gateway, fake runner
   submission, approval side effects, or artifact persistence.
+- DB-themed explanatory/general chat, such as `What is SQL?`,
+  `Explain databases`, and `What is a column?`, is also blocked before PGPT,
+  metadata gateway, fake runner submission, approval side effects, or artifact
+  persistence unless it has a supported DB-analysis action or concrete
+  metadata/object lookup shape.
 - Stored procedure execution, free SQL execution, row-data access, source
   apply, and deploy requests hard-block before PGPT, metadata gateway, fake
   runner submission, approval side effects, or artifact persistence.

@@ -12,7 +12,9 @@ def _read(path: str) -> str:
 
 
 def _spec() -> dict:
-    return yaml.safe_load(_read("spec/development/langgraph_chat_orchestrator_mvp.yaml"))
+    return yaml.safe_load(
+        _read("spec/development/langgraph_chat_orchestrator_mvp.yaml")
+    )
 
 
 def test_g05_langgraph_orchestrator_contract_files_exist():
@@ -36,6 +38,12 @@ def test_g05_contract_preserves_policy_and_checkpoint_boundaries():
 
     assert spec["domainGuard"]["blocksGeneralChat"] is True
     assert spec["domainGuard"]["pgptMayNotAnswerGeneralChat"] is True
+    assert spec["domainGuard"]["requiresSupportedActionOrLookupShape"] is True
+    assert {
+        "What is SQL?",
+        "Explain databases",
+        "What is a column?",
+    } <= set(spec["domainGuard"]["dbThemedGeneralChatBlockedExamples"])
     assert spec["policyGate"]["blockedRequestsDoNotCallPgpt"] is True
     assert spec["policyGate"]["blockedRequestsDoNotSubmitRunner"] is True
     assert spec["policyGate"]["blockedRequestsDoNotPersistArtifacts"] is True
