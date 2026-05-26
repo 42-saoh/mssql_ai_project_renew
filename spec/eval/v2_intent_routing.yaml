@@ -4,3 +4,5 @@ status: scaffold
 cases:
   - id: g02_supported_intents_route_to_expected_paths
     summary: SP analysis, dependency analysis, table design, draft generation, metadata search, and history lookup intents must route to their approved platform boundaries.
+  - id: g05_supported_intents_route_to_expected_boundaries
+    summary: G05 supported DB-analysis intents must route only to codex_runner, metadata_gateway, or history_store as declared by the orchestrator contract.

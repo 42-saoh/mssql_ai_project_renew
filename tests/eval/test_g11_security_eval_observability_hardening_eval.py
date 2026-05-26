@@ -99,6 +99,10 @@ def test_g11_eval_raw_payload_secret_and_connection_requests_block_pre_route(
     def fail_runner(*_args, **_kwargs):
         raise AssertionError("Codex Runner must not be called for redaction-blocked eval input")
 
+    def fail_orchestrator(*_args, **_kwargs):
+        raise AssertionError("Orchestrator routing must not be called for redaction-blocked eval input")
+
+    monkeypatch.setattr(chat_service, "orchestrate_message", fail_orchestrator)
     monkeypatch.setattr(graph_module.PgptResponsesClient, "from_env", staticmethod(lambda: pgpt))
     monkeypatch.setattr(chat_service.metadata_service, "search_metadata", fail_metadata)
     monkeypatch.setattr(chat_service, "submit_codex_run", fail_runner)
@@ -109,6 +113,7 @@ def test_g11_eval_raw_payload_secret_and_connection_requests_block_pre_route(
     assert response["policyDecision"] == "BLOCKED"
     assert response["route"] == "blocked"
     assert expected_blocker in response["blockers"]
+    assert response["orchestrator"]["nodes"] == ["pre_route_redaction_gate"]
     assert pgpt.calls == []
     assert approval_repository.list_all() == []
     assert run_repository.list_codex_runs() == []

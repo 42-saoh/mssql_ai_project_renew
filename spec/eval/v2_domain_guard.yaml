@@ -4,3 +4,5 @@ status: scaffold
 cases:
   - id: g02_general_chat_blocked_baseline
     summary: General non-DB chat must resolve to BLOCKED without PGPT, runner, metadata, or artifact persistence.
+  - id: g05_general_chat_blocked_before_pgpt_runner_or_metadata
+    summary: General and DB-themed explanatory chat must block before PGPT, Metadata Gateway, Codex Runner, approval, or artifact persistence.

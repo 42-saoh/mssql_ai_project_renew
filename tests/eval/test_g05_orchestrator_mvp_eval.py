@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import yaml
 
 from apps.api.api_app.repositories import (
     approval_repository,
@@ -12,6 +15,16 @@ from apps.api.api_app.repositories import (
 from apps.api.api_app.services import chat_service
 from plf_agent_orchestration.graph import orchestrate_message
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_yaml(rel: str) -> dict:
+    return yaml.safe_load((ROOT / rel).read_text(encoding="utf-8"))
+
+
+def _case_ids(cases: list[dict]) -> set[str]:
+    return {case.get("id") or case.get("name") for case in cases}
+
 
 def _clear_repositories():
     conversation_repository.clear()
@@ -19,6 +32,14 @@ def _clear_repositories():
     artifact_repository.clear()
     validation_repository.clear()
     approval_repository.clear()
+
+
+def test_g05_orchestrator_eval_cases_are_declared():
+    spec = _load_yaml("spec/development/langgraph_chat_orchestrator_mvp.yaml")
+
+    for suite, expected_cases in spec["evalCases"].items():
+        suite_spec = _load_yaml(f"spec/eval/{suite}.yaml")
+        assert set(expected_cases) <= _case_ids(suite_spec["cases"])
 
 
 @pytest.mark.parametrize(

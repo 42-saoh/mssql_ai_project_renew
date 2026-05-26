@@ -11,7 +11,9 @@ from apps.api.api_app.services.codex_runner_client import submit_codex_run
 from apps.api.api_app.services.observability_service import record_observability_event
 from apps.api.api_app.services.persistence_safety import assert_safe_to_persist, summarize_user_message
 from plf_agent_contracts.codex_runner import ServiceCodexRunRequest, TargetRef
+from plf_agent_orchestration.forbidden_operations import detect_forbidden_operation_blockers
 from plf_agent_orchestration.graph import orchestrate_message
+from plf_agent_orchestration.state import safe_checkpoint_from_state
 from plf_agent_validation.redaction_validator import find_redaction_violations
 
 _RUNNER_INTENT_CONFIG = {
@@ -50,13 +52,24 @@ _REDACTION_BLOCKER_CODES = {
     "ROW_DATA",
     "SECRET",
 }
+_PRE_ROUTE_REDACTION_BLOCKER_CODES = {
+    "CONNECTION_STRING",
+    "RAW_PROMPT",
+    "RAW_PROVIDER_RESPONSE",
+    "RAW_SP",
+    "SECRET",
+}
 
 
 def create_chat_run(message: str, *, conversation_id: str | None = None, actor_id: str | None = None) -> dict[str, object]:
     actor = require_actor_id(actor_id)
     conversation_id = conversation_id or f"conv_{uuid4().hex[:12]}"
     chat_run_id = f"chatrun_{uuid4().hex[:12]}"
-    routed = orchestrate_message(
+    routed = _pre_route_redaction_gate(
+        message,
+        conversation_id=conversation_id,
+        chat_run_id=chat_run_id,
+    ) or orchestrate_message(
         message,
         conversation_id=conversation_id,
         chat_run_id=chat_run_id,
@@ -241,6 +254,65 @@ def _safe_blockers(blockers: list[object]) -> list[str]:
         if safe_code not in safe:
             safe.append(safe_code)
     return safe
+
+
+def _pre_route_redaction_gate(
+    message: str,
+    *,
+    conversation_id: str,
+    chat_run_id: str,
+) -> dict[str, object] | None:
+    redaction_blockers = [
+        code
+        for code in find_redaction_violations(message)
+        if code in _PRE_ROUTE_REDACTION_BLOCKER_CODES
+    ]
+    if not redaction_blockers:
+        return None
+
+    blockers = _dedupe(detect_forbidden_operation_blockers(message) or redaction_blockers)
+    checkpoint = safe_checkpoint_from_state(
+        {
+            "schemaVersion": "OrchestratorState.v1",
+            "conversationId": conversation_id,
+            "chatRunId": chat_run_id,
+            "sanitizedMessageSummary": "Sanitized DB analysis request.",
+            "intent": "BLOCKED_OR_APPROVAL_REQUIRED",
+            "policyDecision": "BLOCKED",
+            "blockers": blockers,
+            "route": "blocked",
+            "artifactIds": [],
+            "reviewMarkers": [],
+            "pgptUsed": False,
+            "pgptFallbackReason": "POLICY_BLOCKED_BEFORE_PGPT",
+            "steps": ["pre_route_redaction_gate"],
+        }
+    )
+    return {
+        "intent": "BLOCKED_OR_APPROVAL_REQUIRED",
+        "policyDecision": "BLOCKED",
+        "blockers": blockers,
+        "route": "blocked",
+        "pgptUsed": False,
+        "pgptModel": None,
+        "pgptFallbackReason": "POLICY_BLOCKED_BEFORE_PGPT",
+        "pgptReasonSummary": None,
+        "runnerRequest": None,
+        "checkpoint": checkpoint,
+        "orchestrator": {
+            "engine": "service_pre_route",
+            "checkpoint": "service_boundary",
+            "nodes": ["pre_route_redaction_gate"],
+        },
+    }
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    deduped: list[str] = []
+    for item in items:
+        if item not in deduped:
+            deduped.append(item)
+    return deduped
 
 
 def _runner_request_for_gateway(

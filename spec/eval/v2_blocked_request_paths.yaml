@@ -10,6 +10,8 @@ cases:
     summary: Blocked requests must return a policy decision and must not create codex runs or persisted artifacts.
   - id: g03_blocked_api_requests_do_not_submit_runner_or_artifacts
     summary: FastAPI blocked request handling must not submit Service Codex Runner work or persist artifacts.
+  - id: g05_hard_blocked_operations_have_no_downstream_side_effects
+    summary: G05 hard-blocked row-data, free SQL, stored-procedure execution, source apply, and deploy requests must not call PGPT, Metadata Gateway, Codex Runner, approvals, or artifact persistence.
   - id: g06_blocked_metadata_gateway_requests_do_not_proxy
     summary: Metadata Gateway blocks unsafe tool names, arguments, and search queries before the external MSSQL MCP transport is called.
   - id: g11_blocked_requests_emit_safe_observability_without_side_effects

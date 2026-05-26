@@ -6,3 +6,5 @@ cases:
     summary: Runner proposals must not instruct users or systems to execute SQL, stored procedures, DDL/DML, source apply, or deploy.
   - id: g02_runner_policy_blocks_unsafe_outputs
     summary: Runner policy validation must reject raw payloads, retired artifact types, production-ready outputs, and executable apply instructions.
+  - id: g05_fake_runner_routes_metadata_only_without_artifact_persistence
+    summary: G05 fake runner routing must persist only submission and validation metadata without fake proposal content or artifact records.

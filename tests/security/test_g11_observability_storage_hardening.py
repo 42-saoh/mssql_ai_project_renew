@@ -76,6 +76,10 @@ def test_g11_redaction_markers_hard_block_before_downstream_side_effects(
         calls["runner"] += 1
         raise AssertionError("Codex Runner must not be called for redaction-blocked chat input")
 
+    def fail_orchestrator(*_args, **_kwargs):
+        raise AssertionError("Orchestrator routing must not be called for redaction-blocked chat input")
+
+    monkeypatch.setattr(chat_service, "orchestrate_message", fail_orchestrator)
     monkeypatch.setattr(graph_module.PgptResponsesClient, "from_env", staticmethod(lambda: pgpt))
     monkeypatch.setattr(chat_service.metadata_service, "search_metadata", fail_metadata)
     monkeypatch.setattr(chat_service, "submit_codex_run", fail_runner)
@@ -87,6 +91,7 @@ def test_g11_redaction_markers_hard_block_before_downstream_side_effects(
     assert response["route"] == "blocked"
     assert expected_blocker in response["blockers"]
     assert response["checkpoint"]["blockers"] == ["REDACTION_VIOLATION_BLOCKED"]
+    assert response["orchestrator"]["nodes"] == ["pre_route_redaction_gate"]
     assert "approvalId" not in response
     assert "codexRunId" not in response
     assert "metadataSearch" not in response
