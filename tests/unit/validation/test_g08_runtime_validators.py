@@ -96,6 +96,17 @@ def test_runtime_validator_blocks_executable_procedure_instruction():
     assert "EXECUTABLE_APPLY_INSTRUCTION" in blockers
 
 
+def test_runtime_validator_fails_closed_for_non_json_artifact_proposal_entry():
+    result = _base_result()
+    result["artifactProposals"] = [object()]
+
+    ok, blockers = validate_runtime_result(result)
+
+    assert not ok
+    assert any(blocker.startswith("RUNNER_RESULT_SCHEMA_INVALID") for blocker in blockers)
+    assert "ARTIFACT_SCHEMA_INVALID:$:type" in blockers
+
+
 @pytest.mark.parametrize(
     "content",
     [

@@ -580,3 +580,33 @@ def test_submit_real_run_blocks_malformed_validation_fields(tmp_path, validation
     )
 
     _assert_safe_blocked_malformed_output(result, unsafe_text="provider response")
+
+
+def test_submit_real_run_blocks_validation_mapping_payload_without_echoing_model_diagnostics(tmp_path):
+    diagnostic = "model generated validation diagnostic"
+
+    def fake_codex(command, **kwargs):
+        workspace = Path(command[command.index("--cd") + 1])
+        result = _valid_result()
+        result["validation"] = {
+            "schemaValid": "yes",
+            "policyValid": True,
+            "staticValidationPassed": True,
+            "modelDiagnostic": diagnostic,
+        }
+        (workspace / "outputs/final.json").write_text(json.dumps(result), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    result = submit_real_run(
+        _request(),
+        {"evidenceRefs": ["evidence.bundle.1"]},
+        config=RealRunnerConfig(workspace_base=tmp_path, runtime_template=RUNTIME_TEMPLATE),
+        run_command=fake_codex,
+    )
+
+    serialized = json.dumps(result)
+    assert result["status"] == "BLOCKED"
+    assert result["artifactProposals"] == []
+    assert any(blocker.startswith("RUNNER_RESULT_SCHEMA_INVALID") for blocker in result["blockers"])
+    assert set(result["validation"]) == {"schemaValid", "policyValid", "staticValidationPassed"}
+    assert diagnostic not in serialized

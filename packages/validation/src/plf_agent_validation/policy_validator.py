@@ -69,7 +69,7 @@ def validate_runtime_result(result: Any) -> tuple[bool, list[str]]:
     if result.get("productionReady") is not False:
         blockers.append("PRODUCTION_READY_TRUE_BLOCKED")
 
-    text = json.dumps(result, ensure_ascii=False)
+    text = json.dumps(result, ensure_ascii=False, default=str)
     blockers.extend(find_redaction_violations(text))
 
     if any(pattern.search(text) for pattern in FORBIDDEN_OUTPUT_PATTERNS):

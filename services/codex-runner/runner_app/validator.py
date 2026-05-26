@@ -13,6 +13,7 @@ from plf_agent_validation.schema_validator import validate_runner_result_schema
 DEFAULT_RUNTIME_SCHEMA_ROOT = Path(__file__).resolve().parents[1] / "runtime-template" / "schemas"
 PROPOSAL_ALLOWED_STATUSES = {"SUCCEEDED", "REVIEW_REQUIRED"}
 FAILED_OR_BLOCKED_STATUSES = {"FAILED", "BLOCKED"}
+VALIDATION_FLAG_KEYS = {"schemaValid", "policyValid", "staticValidationPassed"}
 
 
 def validate_result(
@@ -71,7 +72,7 @@ def mark_validated(
     existing_blockers = _as_list(validated.get("blockers"))
     validated["blockers"] = _dedupe(existing_blockers + blockers)
     validation_value = validated.get("validation")
-    validation = dict(validation_value) if isinstance(validation_value, Mapping) else {}
+    validation = _safe_validation_flags(validation_value)
     validation.update(flags)
     validated["validation"] = validation
     if blockers:
@@ -171,3 +172,13 @@ def _as_list(value: Any) -> list[Any]:
     if isinstance(value, (tuple, set)):
         return list(value)
     return [value]
+
+
+def _safe_validation_flags(value: Any) -> dict[str, bool]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {
+        key: item
+        for key, item in value.items()
+        if key in VALIDATION_FLAG_KEYS and isinstance(item, bool)
+    }

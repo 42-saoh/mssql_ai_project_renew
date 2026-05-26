@@ -51,6 +51,7 @@ _NO_DETAIL_PREFIXES = {
     "RETIRED_ARTIFACT_TYPE",
     "UNKNOWN_ARTIFACT_TYPE",
 }
+_VALIDATION_FLAG_KEYS = {"schemaValid", "policyValid", "staticValidationPassed"}
 
 
 def sanitize_result(result: Any, request: dict[str, Any] | None = None) -> tuple[dict[str, Any], list[str]]:
@@ -106,7 +107,7 @@ def safe_blocked_result(
         },
     }
     if validation:
-        result["validation"].update(validation)
+        result["validation"].update(_safe_validation_flags(validation))
     if runtime:
         result["runtime"] = runtime
     return result
@@ -123,6 +124,16 @@ def _safe_target_key(request: Mapping[str, Any]) -> str:
 
 def _is_safe_target_key(value: str) -> bool:
     return bool(value and _SAFE_TARGET_KEY.fullmatch(value) and not find_redaction_violations(value))
+
+
+def _safe_validation_flags(validation: Any) -> dict[str, bool]:
+    if not isinstance(validation, Mapping):
+        return {}
+    return {
+        key: value
+        for key, value in validation.items()
+        if key in _VALIDATION_FLAG_KEYS and isinstance(value, bool)
+    }
 
 
 def safe_blocker_codes(blockers: Any) -> list[str]:
