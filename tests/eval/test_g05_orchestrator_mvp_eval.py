@@ -23,7 +23,7 @@ def _load_yaml(rel: str) -> dict:
 
 
 def _case_ids(cases: list[dict]) -> set[str]:
-    return {case.get("id") or case.get("name") for case in cases}
+    return {case["id"] for case in cases if "id" in case}
 
 
 def _clear_repositories():
@@ -39,7 +39,35 @@ def test_g05_orchestrator_eval_cases_are_declared():
 
     for suite, expected_cases in spec["evalCases"].items():
         suite_spec = _load_yaml(f"spec/eval/{suite}.yaml")
-        assert set(expected_cases) <= _case_ids(suite_spec["cases"])
+        assert suite_spec["name"] == suite
+        missing_cases = set(expected_cases) - _case_ids(suite_spec["cases"])
+        assert not missing_cases, f"{suite} missing G05 eval cases: {sorted(missing_cases)}"
+
+
+def test_g05_eval_case_contract_matches_suite_g05_cases():
+    spec = _load_yaml("spec/development/langgraph_chat_orchestrator_mvp.yaml")
+    declared_cases = {
+        case_id
+        for expected_cases in spec["evalCases"].values()
+        for case_id in expected_cases
+    }
+
+    assert declared_cases
+    assert all(case_id.startswith("g05_") for case_id in declared_cases)
+
+    for suite in spec["evalCases"]:
+        suite_spec = _load_yaml(f"spec/eval/{suite}.yaml")
+        suite_g05_cases = {
+            case_id
+            for case_id in _case_ids(suite_spec["cases"])
+            if case_id.startswith("g05_")
+        }
+        undeclared_cases = suite_g05_cases - declared_cases
+        assert not undeclared_cases, (
+            f"{suite} has G05 eval cases not declared in "
+            "spec/development/langgraph_chat_orchestrator_mvp.yaml: "
+            f"{sorted(undeclared_cases)}"
+        )
 
 
 @pytest.mark.parametrize(

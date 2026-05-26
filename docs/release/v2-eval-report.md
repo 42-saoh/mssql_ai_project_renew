@@ -18,6 +18,7 @@ safe observability. The release gate continues to include the suites listed in
 - `g11_observability_events_store_safe_codes_only`
 - `g11_release_runbooks_document_redaction_response`
 - `g11_blocked_requests_emit_safe_observability_without_side_effects`
+- `g11_raw_payload_secret_connection_requests_block_before_side_effects`
 
 ## Validation Commands
 
